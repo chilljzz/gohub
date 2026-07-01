@@ -13,8 +13,11 @@ type Response struct {
 }
 
 const (
-	CodeSuccess = 0
-	CodeFail    = 1
+	CodeSuccess      = 0
+	CodeFail         = 1
+	CodeInvalidParam = 4000
+	CodeUserExists   = 4001
+	CodeServerError  = 5000
 )
 
 func Success(ctx *gin.Context, data interface{}) {

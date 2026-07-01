@@ -4,15 +4,19 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/chilljzz/gohub/configs/config"
+	"github.com/chilljzz/gohub/internal/database"
 	"github.com/chilljzz/gohub/internal/router"
+	"github.com/chilljzz/gohub/pkg/config"
 )
 
 func main() {
 
-	err := config.InitConfig()
-	if err != nil {
+	if err := config.InitConfig(); err != nil {
 		log.Fatalf("init config failed: %v", err)
+	}
+
+	if err := database.InitMySQL(); err != nil {
+		log.Fatalf("init mysql failed: %v", err)
 	}
 
 	r := router.InitRouter()
