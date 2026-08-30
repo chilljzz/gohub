@@ -8,21 +8,29 @@ import (
 	"github.com/chilljzz/gohub/internal/dto"
 	"github.com/chilljzz/gohub/internal/model"
 	"github.com/chilljzz/gohub/internal/repository"
+	"gorm.io/gorm"
 )
 
 var (
-	ErrMessageContentRequired = errors.New(
-		"message content is required",
-	)
+	ErrMessageContentRequired = errors.New("message content is required")
 
-	ErrMessageTooLong = errors.New(
-		"message is too long",
-	)
+	ErrMessageTooLong = errors.New("message is too long")
+
+	ErrMessageCreateFailed = errors.New("message create failed")
+
+	ErrInvalidClientMessageID = errors.New("invalid client message id")
+
+	ErrClientMessageConflict = errors.New("client message id conflict")
 )
 
 type ChannelMessageService struct {
 	messageRepo     *repository.ChannelMessageRepository
 	realtimeService *RealtimeService
+}
+
+type CreateMessageResult struct {
+	Message *dto.ChannelMessageResult
+	Created bool
 }
 
 func NewChannelMessageService(
@@ -39,8 +47,16 @@ func (s *ChannelMessageService) CreateChannelMessage(
 	userID uint,
 	channelID uint,
 	content string,
-) (*dto.ChannelMessageResult, error) {
+	clientMessageID string,
+) (*CreateMessageResult, error) {
 	content = strings.TrimSpace(content)
+	clientMessageID = strings.TrimSpace(clientMessageID)
+
+	if clientMessageID == "" ||
+		len(clientMessageID) > 64 {
+
+		return nil, ErrInvalidClientMessageID
+	}
 
 	if content == "" {
 		return nil, ErrMessageContentRequired
@@ -58,24 +74,58 @@ func (s *ChannelMessageService) CreateChannelMessage(
 	}
 
 	message := &model.ChannelMessage{
-		ChannelID: channelID,
-		SenderID:  userID,
-		Content:   content,
+		ChannelID:       channelID,
+		SenderID:        userID,
+		ClientMessageID: clientMessageID,
+		Content:         content,
 	}
 
-	if err := s.messageRepo.Create(message); err != nil {
+	err = s.messageRepo.Create(message)
+
+	if err == nil {
+		result := &dto.ChannelMessageResult{
+			ID:              message.ID,
+			ChannelID:       message.ChannelID,
+			SenderID:        message.SenderID,
+			ClientMessageID: message.ClientMessageID,
+			Content:         message.Content,
+			CreatedAt:       message.CreatedAt,
+		}
+
+		return &CreateMessageResult{
+			Message: result,
+			Created: true,
+		}, nil
+	}
+
+	if !errors.Is(err, gorm.ErrDuplicatedKey) {
 		return nil, err
 	}
 
-	result := &dto.ChannelMessageResult{
-		ID:        message.ID,
-		ChannelID: message.ChannelID,
-		SenderID:  message.SenderID,
-		Content:   message.Content,
-		CreatedAt: message.CreatedAt,
-	}
+	existing, err := s.messageRepo.FindByClientMessageID(userID, clientMessageID)
 
-	return result, nil
+	if err != nil {
+		return nil, err
+	}
+	if existing == nil {
+		return nil, ErrMessageCreateFailed
+	}
+	if existing.ChannelID != channelID || existing.Content != content {
+		return nil, ErrClientMessageConflict
+	}
+	exist := &dto.ChannelMessageResult{
+		ID:              existing.ID,
+		ChannelID:       existing.ChannelID,
+		SenderID:        existing.SenderID,
+		ClientMessageID: existing.ClientMessageID,
+		Content:         existing.Content,
+		CreatedAt:       existing.CreatedAt,
+	}
+	return &CreateMessageResult{
+		Message: exist,
+		Created: false,
+	}, nil
+
 }
 
 func (s *ChannelMessageService) ListMessageBefore(

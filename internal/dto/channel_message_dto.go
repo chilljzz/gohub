@@ -1,13 +1,16 @@
 package dto
 
-import "time"
+import (
+	"time"
+)
 
 type ChannelMessageResult struct {
-	ID        uint      `json:"id"`
-	ChannelID uint      `json:"channel_id"`
-	SenderID  uint      `json:"sender_id"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
+	ID              uint      `json:"id"`
+	ChannelID       uint      `json:"channel_id"`
+	SenderID        uint      `json:"sender_id"`
+	ClientMessageID string    `json:"client_message_id"`
+	Content         string    `json:"content"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type ChannelMessagePageResult struct {

@@ -140,3 +140,28 @@ func reverseMessages(messages []model.ChannelMessage) {
 			messages[right], messages[left]
 	}
 }
+
+func (r *ChannelMessageRepository) FindByClientMessageID(
+	senderID uint,
+	clientMessageID string,
+) (*model.ChannelMessage, error) {
+	var message model.ChannelMessage
+
+	err := database.DB.
+		Where(
+			"sender_id = ? AND client_message_id = ?",
+			senderID,
+			clientMessageID,
+		).
+		First(&message).
+		Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &message, nil
+}

@@ -102,44 +102,27 @@ func (h *WSMessageHandler) handleSendMessage(
 		return
 	}
 
-	message, err := h.messageService.CreateChannelMessage(
+	messageResult, err := h.messageService.CreateChannelMessage(
 		client.UserID,
 		req.ChannelID,
 		req.Content,
+		req.ClientMessageID,
 	)
 
 	if err != nil {
-		switch {
-		case errors.Is(
+		h.handleMessageError(
+			client,
 			err,
-			service.ErrMessageContentRequired,
-		):
-			h.sendError(client, err.Error())
-		case errors.Is(
-			err,
-			service.ErrMessageTooLong,
-		):
-			h.sendError(client, err.Error())
-		case errors.Is(
-			err,
-			service.ErrChannelNotFound,
-		):
-			h.sendError(client, err.Error())
-		case errors.Is(
-			err,
-			service.ErrNotTeamMember,
-		):
-			h.sendError(client, err.Error())
-		default:
-			log.Printf(
-				"create channel message failed: %v",
-				err,
-			)
-			h.sendError(client, err.Error())
-		}
+		)
+
 		return
 	}
 
+	if !messageResult.Created {
+		return
+	}
+
+	message := messageResult.Message
 	outGoingMessage := &ws.OutgoingMessage{
 		Type:      "channel_message",
 		MessageID: message.ID,
@@ -232,4 +215,31 @@ func (h *WSMessageHandler) publishChannelMessage(
 		channelID,
 		payload,
 	)
+}
+
+func (h *WSMessageHandler) handleMessageError(
+	client *ws.Client,
+	err error,
+) {
+	switch {
+	case errors.Is(err, service.ErrMessageContentRequired),
+		errors.Is(err, service.ErrMessageTooLong),
+		errors.Is(err, service.ErrChannelNotFound),
+		errors.Is(err, service.ErrNotTeamMember),
+		errors.Is(err, service.ErrInvalidClientMessageID),
+		errors.Is(err, service.ErrClientMessageConflict):
+
+		h.sendError(client, err.Error())
+
+	default:
+		log.Printf(
+			"websocket message error: %v",
+			err,
+		)
+
+		h.sendError(
+			client,
+			"internal server error",
+		)
+	}
 }

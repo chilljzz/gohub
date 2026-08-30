@@ -24,7 +24,7 @@ func InitMySQL(c config.MySQLConfig) error {
 		c.Database,
 		c.Charset,
 	)
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{TranslateError: true})
 	if err != nil {
 		return err
 	}
