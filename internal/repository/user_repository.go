@@ -30,3 +30,20 @@ func (r *UserRepository) FindByUsername(username string) (*model.User, error) {
 func (r *UserRepository) Create(user *model.User) error {
 	return database.DB.Create(user).Error
 }
+
+func (r *UserRepository) FindByID(id uint) (*model.User, error) {
+	var user model.User
+	err := database.DB.Find(&user, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (r *UserRepository) UpdateProfile(userID uint, updates map[string]any) error {
+	return database.DB.Model(&model.User{}).Where("id = ?", userID).Updates(updates).Error
+}

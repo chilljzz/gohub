@@ -13,11 +13,34 @@ type Response struct {
 }
 
 const (
-	CodeSuccess      = 0
-	CodeFail         = 1
+	CodeSuccess = 0
+	CodeFail    = 1
+
 	CodeInvalidParam = 4000
-	CodeUserExists   = 4001
+	CodeUnauthorized = 4010
+	CodeForbidden    = 4030
 	CodeServerError  = 5000
+
+	CodeUserExists         = 4001
+	CodeUsernameOrPassword = 4002
+	CodeUserNotFound       = 4003
+
+	CodeCannotAddSelf          = 4100
+	CodeAlreadyFriends         = 4101
+	CodeFriendRequestExists    = 4102
+	CodeFriendRequestNotFound  = 4103
+	CodeFriendRequestProcessed = 4104
+
+	CodeTeamNotFound      = 6001
+	CodeNotTeamMember     = 6002
+	CodeNotTeamOwner      = 6003
+	CodeAlreadyTeamMember = 6004
+
+	CodeMessageNotFound     = 7001
+	CodeMessageNotInChannel = 7002
+
+	CodeChannelNotFound = 6101
+	CodeChannelExists   = 6102
 )
 
 func Success(ctx *gin.Context, data interface{}) {

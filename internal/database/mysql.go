@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/chilljzz/gohub/internal/model"
 	"github.com/chilljzz/gohub/pkg/config"
@@ -11,8 +12,8 @@ import (
 
 var DB *gorm.DB
 
-func InitMySQL() error {
-	c := config.Conf.Mysql
+func InitMySQL(c config.MySQLConfig) error {
+	// c := config.Conf.Mysql
 
 	dsn := fmt.Sprintf(
 		"%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=True&loc=Local",
@@ -28,8 +29,17 @@ func InitMySQL() error {
 		return err
 	}
 	DB = db
-	fmt.Println("MySQL connected success")
-	if err := DB.AutoMigrate(&model.User{}); err != nil {
+	log.Println("MySQL connected success")
+	if err := DB.AutoMigrate(
+		&model.User{},
+		&model.FriendRequest{},
+		&model.Friendship{},
+		&model.Team{},
+		&model.TeamMember{},
+		&model.Channel{},
+		&model.ChannelMessage{},
+		&model.ChannelRead{},
+	); err != nil {
 		return err
 	}
 	return nil

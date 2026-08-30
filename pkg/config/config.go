@@ -5,6 +5,13 @@ import "github.com/spf13/viper"
 type Config struct {
 	Server ServerConfig `mapstructure:"server"`
 	Mysql  MySQLConfig  `mapstructure:"mysql"`
+	JWT    JWTConfig    `mapstructure:"jwt"`
+	Redis  RedisConfig  `mapstructure:"redis"`
+}
+type RedisConfig struct {
+	Addr     string `mapstructure:"addr"`
+	Password string `mapstructure:"password"`
+	DB       int    `mapstructure:"db"`
 }
 
 type ServerConfig struct {
@@ -19,6 +26,11 @@ type MySQLConfig struct {
 	Password string `mapstructure:"password"`
 	Database string `mapstructure:"database"`
 	Charset  string `mapstructure:"charset"`
+}
+
+type JWTConfig struct {
+	Secret      string `mapstructure:"secret"`
+	ExpireHours int    `mapstructure:"expire_hours"`
 }
 
 var Conf Config
