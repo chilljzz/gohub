@@ -118,11 +118,37 @@ func (h *WSMessageHandler) handleSendMessage(
 		return
 	}
 
+	message := messageResult.Message
+
+	ack := ws.MessageAck{
+		Type:            "message_ack",
+		ClientMessageID: message.ClientMessageID,
+		MessageID:       message.ID,
+		ChannelID:       message.ChannelID,
+	}
+	ackPayload, err := json.Marshal(ack)
+	if err != nil {
+		log.Printf(
+			"marshal message ack failed: %v",
+			err,
+		)
+		return
+	}
+
+	if ok := client.SendMessage(
+		ackPayload,
+	); !ok {
+		log.Printf(
+			"send ack failed: user_id=%d message_id=%d",
+			client.UserID,
+			message.ID,
+		)
+	}
+
 	if !messageResult.Created {
 		return
 	}
 
-	message := messageResult.Message
 	outGoingMessage := &ws.OutgoingMessage{
 		Type:      "channel_message",
 		MessageID: message.ID,
