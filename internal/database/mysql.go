@@ -39,6 +39,8 @@ func InitMySQL(c config.MySQLConfig) error {
 		&model.Channel{},
 		&model.ChannelMessage{},
 		&model.ChannelRead{},
+		&model.Conversation{},
+		&model.ConversationMember{},
 	); err != nil {
 		return err
 	}
