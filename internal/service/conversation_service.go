@@ -5,12 +5,43 @@ import (
 	"fmt"
 
 	"github.com/chilljzz/gohub/internal/model"
-	"github.com/chilljzz/gohub/internal/repository"
 	"gorm.io/gorm"
 )
 
+type ConversationRepository interface {
+	FindByChannelID(
+		channelID uint,
+	) (*model.Conversation, error)
+
+	Create(
+		conversation *model.Conversation,
+	) error
+
+	FindByDirectKey(
+		directKey string,
+	) (*model.Conversation, error)
+
+	CreateDirectWithMembers(
+		conversation *model.Conversation,
+		userID uint,
+		otherUserID uint,
+	) error
+
+	ListMembers(
+		conversationID uint,
+	) ([]model.ConversationMember, error)
+}
+
+type FriendshipChecker interface {
+	IsFriend(
+		userID uint,
+		friendID uint,
+	) (bool, error)
+}
+
 type ConversationService struct {
-	conversationRepo *repository.ConversationRepository
+	conversationRepo ConversationRepository
+	friendChecker    FriendshipChecker
 }
 
 var (
@@ -18,10 +49,12 @@ var (
 )
 
 func NewConversationService(
-	conversationRepo *repository.ConversationRepository,
+	conversationRepo ConversationRepository,
+	friendChecker FriendshipChecker,
 ) *ConversationService {
 	return &ConversationService{
 		conversationRepo: conversationRepo,
+		friendChecker:    friendChecker,
 	}
 }
 

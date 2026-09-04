@@ -100,3 +100,75 @@ func (r *ConversationRepository) IsMember(
 
 	return count > 0, nil
 }
+
+func (r *ConversationRepository) FindByDirectKey(
+	directKey string,
+) (*model.Conversation, error) {
+	var conversation model.Conversation
+
+	err := r.db.
+		Where(
+			"type = ? AND direct_key = ?",
+			model.ConversationTypeDirect,
+			directKey,
+		).First(&conversation).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &conversation, nil
+}
+
+func (r *ConversationRepository) ListMember(
+	conversationID uint,
+) ([]model.ConversationMember, error) {
+	var members []model.ConversationMember
+
+	err := r.db.
+		Where(
+			"conversation_id = ?",
+			conversationID,
+		).
+		Find(&members).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return members, nil
+}
+
+func (r *ConversationRepository) CreateDirectWithMembers(
+	conversation *model.Conversation,
+	userID uint,
+	otherUserID uint,
+) error {
+	return r.db.Transaction(
+		func(tx *gorm.DB) error {
+			if err := tx.Create(conversation).Error; err != nil {
+				return err
+			}
+
+			members := []model.ConversationMember{
+				{
+					ConversationID: conversation.ID,
+					UserID:         userID,
+				},
+				{
+					ConversationID: conversation.ID,
+					UserID:         otherUserID,
+				},
+			}
+			if err := tx.Create(&members).Error; err != nil {
+				return err
+			}
+
+			return nil
+		},
+	)
+}
