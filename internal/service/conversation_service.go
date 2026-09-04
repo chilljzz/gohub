@@ -44,10 +44,6 @@ type ConversationService struct {
 	friendChecker    FriendshipChecker
 }
 
-var (
-	ErrConversationNotFound = errors.New("conversation not found")
-)
-
 func NewConversationService(
 	conversationRepo ConversationRepository,
 	friendChecker FriendshipChecker,
@@ -57,6 +53,16 @@ func NewConversationService(
 		friendChecker:    friendChecker,
 	}
 }
+
+var (
+	ErrConversationNotFound = errors.New("conversation not found")
+
+	ErrCannotChatWithSelf = errors.New("cannot chat with self")
+
+	ErrDirectChatRequiresFriend = errors.New("direct chat requires friendship")
+
+	ErrConversationCreateFailed = errors.New("conversation create failed")
+)
 
 func (s *ConversationService) GetChannelConversation(
 	channelID uint,
@@ -102,6 +108,69 @@ func (s *ConversationService) EnsureChannelConversation(
 	}
 
 	return s.conversationRepo.FindByChannelID(channelID)
+
+}
+
+func (s *ConversationService) GetOrCreateDirectConversation(
+	userID uint,
+	otherUserID uint,
+) (*model.Conversation, error) {
+	if userID == otherUserID {
+		return nil, ErrCannotChatWithSelf
+	}
+	isFriend, err := s.friendChecker.IsFriend(userID, otherUserID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !isFriend {
+		return nil, ErrDirectChatRequiresFriend
+	}
+
+	directKey := buildDirectKey(userID, otherUserID)
+
+	existing, err := s.conversationRepo.FindByDirectKey(directKey)
+
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return existing, nil
+	}
+	conversation :=
+		&model.Conversation{
+			Type: model.ConversationTypeDirect,
+
+			DirectKey: &directKey,
+		}
+
+	err =
+		s.conversationRepo.CreateDirectWithMembers(
+			conversation,
+			userID,
+			otherUserID,
+		)
+
+	if err == nil {
+		return conversation, nil
+	}
+
+	if !errors.Is(err, gorm.ErrDuplicatedKey) {
+		return nil, err
+	}
+
+	existing, err = s.conversationRepo.FindByDirectKey(directKey)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if existing == nil {
+		return nil, ErrConversationCreateFailed
+	}
+
+	return existing, nil
 
 }
 
