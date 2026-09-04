@@ -41,6 +41,14 @@ const (
 
 	CodeChannelNotFound = 6101
 	CodeChannelExists   = 6102
+
+	// Conversation
+	CodeConversationNotFound     = 42001
+	CodeCannotChatWithSelf       = 42002
+	CodeDirectChatRequiresFriend = 42003
+	CodeNotConversationMember    = 42004
+	CodeInvalidConversationType  = 42005
+	CodeConversationConflict     = 42006
 )
 
 func Success(ctx *gin.Context, data interface{}) {

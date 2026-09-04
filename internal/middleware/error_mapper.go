@@ -210,6 +210,47 @@ func mapError(err error) *apperror.AppError {
 			Err:  err,
 		}
 
+	case errors.Is(
+		err,
+		service.ErrConversationNotFound,
+	):
+		return &apperror.AppError{
+			Code: response.CodeConversationNotFound,
+			Msg:  "conversation not found",
+			Err:  err,
+		}
+
+	case errors.Is(
+		err,
+		service.ErrConversationCreateFailed,
+	):
+		return &apperror.AppError{
+			Code: response.CodeFail,
+			Msg:  "conversation create fail",
+			Err:  err,
+		}
+
+	case errors.Is(
+		err,
+		service.ErrCannotChatWithSelf,
+	):
+		return &apperror.AppError{
+			Code: response.CodeCannotChatWithSelf,
+			Msg:  "can not chat with self",
+			Err:  err,
+		}
+
+	case errors.Is(
+		err,
+		service.ErrDirectChatRequiresFriend,
+	):
+		return &apperror.AppError{
+			Code: response.CodeDirectChatRequiresFriend,
+			Msg:  " not friends",
+			Err:  err,
+		}
+
 	}
+
 	return nil
 }

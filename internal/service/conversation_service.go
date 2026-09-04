@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/chilljzz/gohub/internal/dto"
 	"github.com/chilljzz/gohub/internal/model"
 	"gorm.io/gorm"
 )
@@ -27,9 +28,9 @@ type ConversationRepository interface {
 		otherUserID uint,
 	) error
 
-	ListMembers(
-		conversationID uint,
-	) ([]model.ConversationMember, error)
+	// ListMembers(
+	// 	conversationID uint,
+	// ) ([]model.ConversationMember, error)
 }
 
 type FriendshipChecker interface {
@@ -114,7 +115,7 @@ func (s *ConversationService) EnsureChannelConversation(
 func (s *ConversationService) GetOrCreateDirectConversation(
 	userID uint,
 	otherUserID uint,
-) (*model.Conversation, error) {
+) (*dto.DirectConversationResult, error) {
 	if userID == otherUserID {
 		return nil, ErrCannotChatWithSelf
 	}
@@ -136,7 +137,10 @@ func (s *ConversationService) GetOrCreateDirectConversation(
 		return nil, err
 	}
 	if existing != nil {
-		return existing, nil
+		return toDirectConversationResult(
+			existing,
+			otherUserID,
+		), nil
 	}
 	conversation :=
 		&model.Conversation{
@@ -153,7 +157,10 @@ func (s *ConversationService) GetOrCreateDirectConversation(
 		)
 
 	if err == nil {
-		return conversation, nil
+		return toDirectConversationResult(
+			conversation,
+			otherUserID,
+		), nil
 	}
 
 	if !errors.Is(err, gorm.ErrDuplicatedKey) {
@@ -170,7 +177,10 @@ func (s *ConversationService) GetOrCreateDirectConversation(
 		return nil, ErrConversationCreateFailed
 	}
 
-	return existing, nil
+	return toDirectConversationResult(
+		existing,
+		otherUserID,
+	), nil
 
 }
 
@@ -188,4 +198,16 @@ func buildDirectKey(userID uint, otherUserID uint) string {
 		otherUserID,
 		userID,
 	)
+}
+
+func toDirectConversationResult(
+	conversation *model.Conversation,
+	otherUserID uint,
+) *dto.DirectConversationResult {
+	return &dto.DirectConversationResult{
+		ConversationID: conversation.ID,
+		Type:           string(conversation.Type),
+		OtherUserID:    otherUserID,
+		CreatedAt:      conversation.CreatedAt,
+	}
 }

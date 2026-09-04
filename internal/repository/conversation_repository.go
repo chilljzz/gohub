@@ -3,26 +3,21 @@ package repository
 import (
 	"errors"
 
+	"github.com/chilljzz/gohub/internal/database"
 	"github.com/chilljzz/gohub/internal/model"
 	"gorm.io/gorm"
 )
 
-type ConversationRepository struct {
-	db *gorm.DB
-}
+type ConversationRepository struct{}
 
-func NewConversationRepository(
-	db *gorm.DB,
-) *ConversationRepository {
-	return &ConversationRepository{
-		db: db,
-	}
+func NewConversationRepository() *ConversationRepository {
+	return &ConversationRepository{}
 }
 
 func (r *ConversationRepository) Create(
 	conversation *model.Conversation,
 ) error {
-	return r.db.Create(conversation).Error
+	return database.DB.Create(conversation).Error
 }
 
 func (r *ConversationRepository) FindByID(
@@ -30,7 +25,7 @@ func (r *ConversationRepository) FindByID(
 ) (*model.Conversation, error) {
 	var conversation model.Conversation
 
-	err := r.db.First(&conversation, id).Error
+	err := database.DB.First(&conversation, id).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -48,7 +43,7 @@ func (r *ConversationRepository) FindByChannelID(
 ) (*model.Conversation, error) {
 	var conversation model.Conversation
 
-	err := r.db.
+	err := database.DB.
 		Where(
 			"type = ? AND channel_id = ?",
 			model.ConversationTypeChannel,
@@ -72,7 +67,7 @@ func (r *ConversationRepository) FindByChannelID(
 func (r *ConversationRepository) AddMember(
 	member *model.ConversationMember,
 ) error {
-	return r.db.Create(member).Error
+	return database.DB.Create(member).Error
 }
 
 func (r *ConversationRepository) IsMember(
@@ -81,7 +76,7 @@ func (r *ConversationRepository) IsMember(
 ) (bool, error) {
 	var count int64
 
-	err := r.db.
+	err := database.DB.
 		Model(
 			&model.ConversationMember{},
 		).
@@ -106,7 +101,7 @@ func (r *ConversationRepository) FindByDirectKey(
 ) (*model.Conversation, error) {
 	var conversation model.Conversation
 
-	err := r.db.
+	err := database.DB.
 		Where(
 			"type = ? AND direct_key = ?",
 			model.ConversationTypeDirect,
@@ -129,7 +124,7 @@ func (r *ConversationRepository) ListMember(
 ) ([]model.ConversationMember, error) {
 	var members []model.ConversationMember
 
-	err := r.db.
+	err := database.DB.
 		Where(
 			"conversation_id = ?",
 			conversationID,
@@ -148,7 +143,7 @@ func (r *ConversationRepository) CreateDirectWithMembers(
 	userID uint,
 	otherUserID uint,
 ) error {
-	return r.db.Transaction(
+	return database.DB.Transaction(
 		func(tx *gorm.DB) error {
 			if err := tx.Create(conversation).Error; err != nil {
 				return err

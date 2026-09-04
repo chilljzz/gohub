@@ -27,6 +27,7 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 	channelRepo := repository.NewChannelRepository()
 	messageRepo := repository.NewChannelMessageRepository()
 	readRepo := repository.NewChannelReadRepository()
+	conversation := repository.NewConversationRepository()
 
 	friendService := service.NewFriendService(
 		friendRepo,
@@ -55,6 +56,7 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 		messageRepo,
 		realtimeService,
 	)
+	conversationService := service.NewConversationService(conversation, friendRepo)
 
 	userController := controller.NewUserController()
 
@@ -88,6 +90,7 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 	readController := controller.NewChannelReadController(
 		readService,
 	)
+	conversationController := controller.NewConversationController(conversationService)
 
 	api := r.Group("/api")
 
@@ -143,6 +146,11 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 		auth.POST("/channels/:id/read", readController.MarkRead)
 		auth.GET("/channels/:id/unread-count", readController.UnreadCount)
 		auth.GET("/channels/:id/messages/sync", messageController.Sync)
+
+		conversationGroup := auth.Group("/conversations")
+		{
+			conversationGroup.POST("/direct", conversationController.CreateDirect)
+		}
 	}
 
 	return r
