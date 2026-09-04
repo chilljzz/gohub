@@ -16,6 +16,8 @@ type Conversation struct {
 
 	ChannelID *uint `gorm:"uniqueIndex" json:"channel_id,omitempty"`
 
+	DirectKey *string `gorm:"size:64;uniqueIndex" json:"-"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/chilljzz/gohub/internal/model"
 	"github.com/chilljzz/gohub/internal/repository"
@@ -69,4 +70,20 @@ func (s *ConversationService) EnsureChannelConversation(
 
 	return s.conversationRepo.FindByChannelID(channelID)
 
+}
+
+func buildDirectKey(userID uint, otherUserID uint) string {
+	if userID < otherUserID {
+		return fmt.Sprintf(
+			"%d:%d",
+			userID,
+			otherUserID,
+		)
+	}
+
+	return fmt.Sprintf(
+		"%d:%d",
+		otherUserID,
+		userID,
+	)
 }
