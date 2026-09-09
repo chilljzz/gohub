@@ -67,7 +67,7 @@ func (s *ChannelService) CreateChannel(
 		CreatedBy:   currentUserID,
 	}
 
-	if err := s.channelRepo.Create(channel); err != nil {
+	if err := s.channelRepo.CreateWithConversation(channel); err != nil {
 		return nil, err
 	}
 

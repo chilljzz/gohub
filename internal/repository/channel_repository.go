@@ -73,3 +73,24 @@ func (r *ChannelRepository) FindByID(
 	}
 	return &channel, nil
 }
+
+func (r *ChannelRepository) CreateWithConversation(
+	channel *model.Channel,
+) error {
+	return database.DB.Transaction(
+		func(tx *gorm.DB) error {
+			if err := tx.Create(channel).Error; err != nil {
+				return err
+			}
+			conversation := &model.Conversation{
+				Type:      model.ConversationTypeChannel,
+				ChannelID: &channel.ID,
+			}
+
+			if err := tx.Create(conversation).Error; err != nil {
+				return err
+			}
+			return nil
+		},
+	)
+}
