@@ -2,6 +2,7 @@ package router
 
 import (
 	"github.com/chilljzz/gohub/internal/controller"
+	"github.com/chilljzz/gohub/internal/database"
 	"github.com/chilljzz/gohub/internal/middleware"
 	"github.com/chilljzz/gohub/internal/realtime"
 	"github.com/chilljzz/gohub/internal/repository"
@@ -21,13 +22,20 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 		})
 	})
 
+	messageRepo :=
+		repository.NewMessageRepository(
+			database.DB,
+		)
+
 	userRepo := repository.NewUserRepository()
 	friendRepo := repository.NewFriendREpository()
 	teamRepo := repository.NewTeamRepository()
 	channelRepo := repository.NewChannelRepository()
-	messageRepo := repository.NewChannelMessageRepository()
+	legacyMessageRepo := repository.NewChannelMessageRepository()
 	readRepo := repository.NewChannelReadRepository()
 	conversation := repository.NewConversationRepository()
+
+	conversationService := service.NewConversationService(conversation, friendRepo)
 
 	friendService := service.NewFriendService(
 		friendRepo,
@@ -50,13 +58,13 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 	messageService := service.NewChannelMessageService(
 		messageRepo,
 		realtimeService,
+		conversationService,
 	)
 	readService := service.NewChannelReadService(
 		readRepo,
-		messageRepo,
+		legacyMessageRepo,
 		realtimeService,
 	)
-	conversationService := service.NewConversationService(conversation, friendRepo)
 
 	userController := controller.NewUserController()
 

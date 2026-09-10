@@ -24,8 +24,9 @@ var (
 )
 
 type ChannelMessageService struct {
-	messageRepo     *repository.ChannelMessageRepository
-	realtimeService *RealtimeService
+	messageRepo         *repository.MessageRepository
+	realtimeService     *RealtimeService
+	conversationService *ConversationService
 }
 
 type CreateMessageResult struct {
@@ -34,12 +35,14 @@ type CreateMessageResult struct {
 }
 
 func NewChannelMessageService(
-	messageRepo *repository.ChannelMessageRepository,
+	messageRepo *repository.MessageRepository,
 	realtimeService *RealtimeService,
+	conversationService *ConversationService,
 ) *ChannelMessageService {
 	return &ChannelMessageService{
-		messageRepo:     messageRepo,
-		realtimeService: realtimeService,
+		messageRepo:         messageRepo,
+		realtimeService:     realtimeService,
+		conversationService: conversationService,
 	}
 }
 
@@ -73,24 +76,26 @@ func (s *ChannelMessageService) CreateChannelMessage(
 		return nil, err
 	}
 
-	message := &model.ChannelMessage{
-		ChannelID:       channelID,
+	conversation, err := s.conversationService.GetChannelConversation(channelID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	message := &model.Message{
+		ConversationID:  conversation.ID,
 		SenderID:        userID,
 		ClientMessageID: clientMessageID,
 		Content:         content,
 	}
 
-	err = s.messageRepo.Create(message)
+	err = s.messageRepo.CreateChannelCompat(message, channelID)
 
 	if err == nil {
-		result := &dto.ChannelMessageResult{
-			ID:              message.ID,
-			ChannelID:       message.ChannelID,
-			SenderID:        message.SenderID,
-			ClientMessageID: message.ClientMessageID,
-			Content:         message.Content,
-			CreatedAt:       message.CreatedAt,
-		}
+		result := toChannelMessageResult(
+			message,
+			channelID,
+		)
 
 		return &CreateMessageResult{
 			Message: result,
@@ -110,17 +115,15 @@ func (s *ChannelMessageService) CreateChannelMessage(
 	if existing == nil {
 		return nil, ErrMessageCreateFailed
 	}
-	if existing.ChannelID != channelID || existing.Content != content {
+	if existing.ConversationID != conversation.ID ||
+		existing.Content != content {
+
 		return nil, ErrClientMessageConflict
 	}
-	exist := &dto.ChannelMessageResult{
-		ID:              existing.ID,
-		ChannelID:       existing.ChannelID,
-		SenderID:        existing.SenderID,
-		ClientMessageID: existing.ClientMessageID,
-		Content:         existing.Content,
-		CreatedAt:       existing.CreatedAt,
-	}
+	exist := toChannelMessageResult(
+		existing,
+		channelID,
+	)
 	return &CreateMessageResult{
 		Message: exist,
 		Created: false,
@@ -146,15 +149,21 @@ func (s *ChannelMessageService) ListMessageBefore(
 		return nil, err
 	}
 
+	conversation, err := s.conversationService.GetChannelConversation(channelID)
+
+	if err != nil {
+		return nil, err
+	}
+
 	messages, hasMore, err := s.messageRepo.ListBefore(
-		channelID,
+		conversation.ID,
 		beforeID,
 		limit,
 	)
 	if err != nil {
 		return nil, err
 	}
-	results := toChannelMessageResults(messages)
+	results := toChannelMessageResults(messages, channelID)
 
 	nextBeforeID := uint(0)
 	if hasMore && len(results) > 0 {
@@ -188,12 +197,15 @@ func (s *ChannelMessageService) SyncMessagesAfter(
 	if err != nil {
 		return nil, err
 	}
-	messages, hasMore, err := s.messageRepo.ListAfter(channelID, afterID, limit)
+
+	conversation, err := s.conversationService.GetChannelConversation(channelID)
+
+	messages, hasMore, err := s.messageRepo.ListAfter(conversation.ID, afterID, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	results := toChannelMessageResults(messages)
+	results := toChannelMessageResults(messages, channelID)
 
 	nextAfterID := afterID
 
@@ -210,7 +222,8 @@ func (s *ChannelMessageService) SyncMessagesAfter(
 }
 
 func toChannelMessageResults(
-	messages []model.ChannelMessage,
+	messages []model.Message,
+	channelID uint,
 ) []dto.ChannelMessageResult {
 	results := make(
 		[]dto.ChannelMessageResult,
@@ -218,14 +231,31 @@ func toChannelMessageResults(
 		len(messages),
 	)
 	for _, message := range messages {
-		results = append(results,
+		results = append(
+			results,
 			dto.ChannelMessageResult{
-				ID:        message.ID,
-				ChannelID: message.ChannelID,
-				SenderID:  message.SenderID,
-				Content:   message.Content,
-				CreatedAt: message.CreatedAt,
-			})
+				ID:              message.ID,
+				ChannelID:       channelID,
+				SenderID:        message.SenderID,
+				ClientMessageID: message.ClientMessageID,
+				Content:         message.Content,
+				CreatedAt:       message.CreatedAt,
+			},
+		)
 	}
 	return results
+}
+
+func toChannelMessageResult(
+	message *model.Message,
+	channelID uint,
+) *dto.ChannelMessageResult {
+	return &dto.ChannelMessageResult{
+		ID:              message.ID,
+		ChannelID:       channelID,
+		SenderID:        message.SenderID,
+		ClientMessageID: message.ClientMessageID,
+		Content:         message.Content,
+		CreatedAt:       message.CreatedAt,
+	}
 }
