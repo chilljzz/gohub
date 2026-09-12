@@ -13,23 +13,26 @@ import (
 )
 
 type WSMessageHandler struct {
-	manager         *ws.Manager
-	realtimeService *service.RealtimeService
-	messageService  *service.ChannelMessageService
-	broker          *realtime.RedisBroker
+	manager             *ws.Manager
+	realtimeService     *service.RealtimeService
+	messageService      *service.ChannelMessageService
+	conversationService *service.ConversationService
+	broker              *realtime.RedisBroker
 }
 
 func NewWSMessageHandler(
 	manager *ws.Manager,
 	realtimeService *service.RealtimeService,
 	messageService *service.ChannelMessageService,
+	conversationService *service.ConversationService,
 	broker *realtime.RedisBroker,
 ) *WSMessageHandler {
 	return &WSMessageHandler{
-		manager:         manager,
-		realtimeService: realtimeService,
-		messageService:  messageService,
-		broker:          broker,
+		manager:             manager,
+		realtimeService:     realtimeService,
+		messageService:      messageService,
+		conversationService: conversationService,
+		broker:              broker,
 	}
 }
 
@@ -78,12 +81,30 @@ func (h *WSMessageHandler) handleJoinChannle(
 		h.sendError(client, err.Error())
 		return
 	}
-	h.manager.JoinChannel(req.ChannelID, client)
+
+	conversation, err := h.conversationService.GetChannelConversation(req.ChannelID)
+
+	if err != nil {
+		h.handleMessageError(client, err)
+	}
+
+	h.manager.BindChannelConversation(req.ChannelID, conversation.ID)
+	h.manager.JoinConversation(conversation.ID, client)
+
+	userIDs := h.manager.RoomUserIDs(
+		conversation.ID,
+	)
+
+	log.Printf(
+		"conversation room: conversation_id=%d users=%v",
+		conversation.ID,
+		userIDs,
+	)
 
 	h.send(client, ws.OutgoingMessage{
-		Type:      "joined_channel",
+		Type:      "joined_conversation",
 		ChannelID: req.ChannelID,
-		Message:   "joined channel successfully",
+		Message:   "joined conversation successfully",
 	})
 }
 
@@ -97,8 +118,14 @@ func (h *WSMessageHandler) handleSendMessage(
 		return
 	}
 
-	if !h.manager.IsInChannel(req.ChannelID, client) {
-		h.sendError(client, "not join this channel")
+	conversation, err := h.conversationService.GetChannelConversation(req.ChannelID)
+
+	if err != nil {
+		h.handleMessageError(client, err)
+	}
+
+	if !h.manager.IsInConversation(conversation.ID, client) {
+		h.sendError(client, "not joined conversation")
 		return
 	}
 
@@ -125,6 +152,7 @@ func (h *WSMessageHandler) handleSendMessage(
 		ClientMessageID: message.ClientMessageID,
 		MessageID:       message.ID,
 		ChannelID:       message.ChannelID,
+		ConversationID:  conversation.ID,
 	}
 	ackPayload, err := json.Marshal(ack)
 	if err != nil {
@@ -150,12 +178,13 @@ func (h *WSMessageHandler) handleSendMessage(
 	}
 
 	outGoingMessage := &ws.OutgoingMessage{
-		Type:      "channel_message",
-		MessageID: message.ID,
-		ChannelID: message.ChannelID,
-		UserID:    message.SenderID,
-		Content:   message.Content,
-		SentAt:    message.CreatedAt.UTC().Format(time.RFC3339),
+		Type:           "channel_message",
+		MessageID:      message.ID,
+		ChannelID:      message.ChannelID,
+		ConversationID: conversation.ID,
+		UserID:         message.SenderID,
+		Content:        message.Content,
+		SentAt:         message.CreatedAt.UTC().Format(time.RFC3339),
 	}
 
 	result, err := json.Marshal(outGoingMessage)
@@ -190,12 +219,18 @@ func (h *WSMessageHandler) handleLeaveChannel(
 		return
 	}
 
-	h.manager.LeaveChannel(req.ChannelID, client)
+	conversation, err := h.conversationService.GetChannelConversation(req.ChannelID)
+
+	if err != nil {
+		h.handleMessageError(client, err)
+	}
+
+	h.manager.LeaveConversation(conversation.ID, client)
 
 	h.send(client, ws.OutgoingMessage{
-		Type:      "left_channel",
+		Type:      "left_conversation",
 		ChannelID: req.ChannelID,
-		Message:   "left channel successfully",
+		Message:   "left conversation successfully",
 	})
 
 }
