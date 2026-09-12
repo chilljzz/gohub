@@ -4,25 +4,27 @@ import (
 	"errors"
 
 	"github.com/chilljzz/gohub/internal/dto"
-	"github.com/chilljzz/gohub/internal/model"
 	"github.com/chilljzz/gohub/internal/repository"
 )
 
 type ChannelReadService struct {
-	readRepo        *repository.ChannelReadRepository
-	messageRepo     *repository.ChannelMessageRepository
-	realtimeService *RealtimeService
+	readRepo            *repository.ConversationReadRepository
+	messageRepo         *repository.MessageRepository
+	realtimeService     *RealtimeService
+	conversationService *ConversationService
 }
 
 func NewChannelReadService(
-	readRepo *repository.ChannelReadRepository,
-	messageRepo *repository.ChannelMessageRepository,
+	readRepo *repository.ConversationReadRepository,
+	messageRepo *repository.MessageRepository,
 	realtimeService *RealtimeService,
+	conversationService *ConversationService,
 ) *ChannelReadService {
 	return &ChannelReadService{
-		readRepo:        readRepo,
-		messageRepo:     messageRepo,
-		realtimeService: realtimeService,
+		readRepo:            readRepo,
+		messageRepo:         messageRepo,
+		realtimeService:     realtimeService,
+		conversationService: conversationService,
 	}
 }
 
@@ -44,8 +46,14 @@ func (s *ChannelReadService) MarkRead(
 		channelID,
 	)
 	if err != nil {
+		return err
+	}
+
+	conversation, err := s.conversationService.GetChannelConversation(channelID)
+	if err != nil {
 		return nil
 	}
+
 	message, err := s.messageRepo.FindByID(messageID)
 	if err != nil {
 		return err
@@ -53,31 +61,17 @@ func (s *ChannelReadService) MarkRead(
 	if message == nil {
 		return ErrMessageNotFound
 	}
-	if message.ChannelID != channelID {
+
+	if message.ConversationID != conversation.ID {
 		return ErrMessageNotInChannel
 	}
-	read, err := s.readRepo.Find(channelID, userID)
-	if err != nil {
-		return err
-	}
-	if read == nil {
-		return s.readRepo.Create(
-			&model.ChannelRead{
-				ChannelID:         channelID,
-				UserID:            userID,
-				LastReadMessageID: messageID,
-			},
-		)
-	}
 
-	if messageID <= read.LastReadMessageID {
-		return nil
-	}
-
-	return s.readRepo.UpdateLastRead(
-		read.ID,
+	return s.readRepo.UpsertLastRead(
+		conversation.ID,
+		userID,
 		messageID,
 	)
+
 }
 
 func (s *ChannelReadService) GetUnreadCount(
@@ -91,10 +85,17 @@ func (s *ChannelReadService) GetUnreadCount(
 	if err != nil {
 		return nil, err
 	}
-	read, err := s.readRepo.Find(channelID, userID)
+
+	conversation, err := s.conversationService.GetChannelConversation(channelID)
 	if err != nil {
 		return nil, err
 	}
+
+	read, err := s.readRepo.Find(conversation.ID, userID)
+	if err != nil {
+		return nil, err
+	}
+
 	lastReadMessageID := uint(0)
 
 	if read != nil {
@@ -102,7 +103,7 @@ func (s *ChannelReadService) GetUnreadCount(
 	}
 
 	count, err := s.messageRepo.CountAfter(
-		channelID,
+		conversation.ID,
 		lastReadMessageID,
 	)
 	if err != nil {

@@ -89,7 +89,7 @@ func (s *ChannelMessageService) CreateChannelMessage(
 		Content:         content,
 	}
 
-	err = s.messageRepo.CreateChannelCompat(message, channelID)
+	err = s.messageRepo.Create(message)
 
 	if err == nil {
 		result := toChannelMessageResult(
