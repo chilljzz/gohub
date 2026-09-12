@@ -11,12 +11,15 @@ type Manager struct {
 	clients map[uint]*Client
 
 	rooms map[uint]map[*Client]struct{}
+
+	channelConversations map[uint]uint
 }
 
 func NewManager() *Manager {
 	return &Manager{
-		clients: make(map[uint]*Client),
-		rooms:   make(map[uint]map[*Client]struct{}),
+		clients:              make(map[uint]*Client),
+		rooms:                make(map[uint]map[*Client]struct{}),
+		channelConversations: make(map[uint]uint),
 	}
 }
 
@@ -91,30 +94,30 @@ func (m *Manager) onlineCount() int {
 	return len(m.clients)
 }
 
-func (m *Manager) JoinChannel(
-	channelID uint,
+func (m *Manager) JoinConversation(
+	ConversationID uint,
 	client *Client,
 ) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	room, ok := m.rooms[channelID]
+	room, ok := m.rooms[ConversationID]
 	if !ok {
 		room = make(map[*Client]struct{})
-		m.rooms[channelID] = room
+		m.rooms[ConversationID] = room
 	}
 	room[client] = struct{}{}
 
 }
 
-func (m *Manager) IsInChannel(
-	channelID uint,
+func (m *Manager) IsInConversation(
+	ConversationID uint,
 	client *Client,
 ) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	room, ok := m.rooms[channelID]
+	room, ok := m.rooms[ConversationID]
 	if !ok {
 		return false
 	}
@@ -122,14 +125,14 @@ func (m *Manager) IsInChannel(
 	return exists
 }
 
-func (m *Manager) LeaveChannel(
-	channelID uint,
+func (m *Manager) LeaveConversation(
+	ConversationID uint,
 	client *Client,
 ) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	room, ok := m.rooms[channelID]
+	room, ok := m.rooms[ConversationID]
 	if !ok {
 		return
 	}
@@ -137,17 +140,17 @@ func (m *Manager) LeaveChannel(
 	delete(room, client)
 
 	if len(room) == 0 {
-		delete(m.rooms, channelID)
+		delete(m.rooms, ConversationID)
 	}
 }
 
-func (m *Manager) BroadcastToChannel(
-	channelID uint,
+func (m *Manager) BroadcastToConversation(
+	ConversationID uint,
 	message []byte,
 ) int {
 	m.mu.RLock()
 
-	room, ok := m.rooms[channelID]
+	room, ok := m.rooms[ConversationID]
 	if !ok {
 		m.mu.RUnlock()
 		return 0
@@ -173,13 +176,69 @@ func (m *Manager) BroadcastToChannel(
 func (m *Manager) removeFromRoomsLocked(
 	Client *Client,
 ) {
-	for channelID, room := range m.rooms {
+	for ConversationID, room := range m.rooms {
 		delete(room, Client)
 
 		if len(room) == 0 {
-			delete(m.rooms, channelID)
+			delete(m.rooms, ConversationID)
 
 		}
 	}
 
+}
+
+func (m *Manager) BindChannelConversation(
+	channelID uint,
+	conversationID uint,
+) {
+	if channelID == 0 || conversationID == 0 {
+		return
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.channelConversations[channelID] = conversationID
+}
+
+func (m *Manager) BroadcastChannelCompat(
+	channelID uint,
+	message []byte,
+) int {
+	m.mu.RLock()
+
+	conversationID, ok := m.channelConversations[channelID]
+
+	m.mu.RUnlock()
+	if !ok {
+		return 0
+	}
+
+	return m.BroadcastToConversation(
+		conversationID,
+		message,
+	)
+}
+
+func (m *Manager) RoomUserIDs(
+	conversationID uint,
+) []uint {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	room, ok := m.rooms[conversationID]
+	if !ok {
+		return nil
+	}
+
+	userIDs := make([]uint, 0, len(room))
+
+	for client := range room {
+		userIDs = append(
+			userIDs,
+			client.UserID,
+		)
+	}
+
+	return userIDs
 }

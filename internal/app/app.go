@@ -65,7 +65,7 @@ func (a *App) startRedisSubscriber(
 					return
 				}
 
-				count := a.manager.BroadcastToChannel(
+				count := a.manager.BroadcastChannelCompat(
 					channelID,
 					payload,
 				)

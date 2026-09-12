@@ -87,6 +87,7 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 		wsManager,
 		realtimeService,
 		messageService,
+		conversationService,
 		broker,
 	)
 
