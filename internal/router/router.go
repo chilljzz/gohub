@@ -22,18 +22,20 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 		})
 	})
 
+	db := database.DB
 	messageRepo :=
 		repository.NewMessageRepository(
-			database.DB,
+			db,
 		)
 
 	userRepo := repository.NewUserRepository()
 	friendRepo := repository.NewFriendREpository()
 	teamRepo := repository.NewTeamRepository()
 	channelRepo := repository.NewChannelRepository()
-	legacyMessageRepo := repository.NewChannelMessageRepository()
-	readRepo := repository.NewChannelReadRepository()
+	// legacyMessageRepo := repository.NewChannelMessageRepository()
+	// readRepo := repository.NewChannelReadRepository()
 	conversation := repository.NewConversationRepository()
+	conversationReadRepo := repository.NewConversationReadRepository(db)
 
 	conversationService := service.NewConversationService(conversation, friendRepo)
 
@@ -61,9 +63,10 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 		conversationService,
 	)
 	readService := service.NewChannelReadService(
-		readRepo,
-		legacyMessageRepo,
+		conversationReadRepo,
+		messageRepo,
 		realtimeService,
+		conversationService,
 	)
 
 	userController := controller.NewUserController()
