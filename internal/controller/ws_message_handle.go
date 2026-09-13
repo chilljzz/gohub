@@ -44,6 +44,7 @@ func (h *WSMessageHandler) Handle(
 
 	if err := json.Unmarshal(data, &req); err != nil {
 		h.sendError(client, "invalid message format")
+		return
 	}
 
 	switch req.Type {
