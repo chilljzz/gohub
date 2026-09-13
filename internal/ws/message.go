@@ -2,9 +2,11 @@ package ws
 
 type IncomingMessage struct {
 	Type            string `json:"type"`
-	ChannelID       uint   `json:"channel_id"`
-	ClientMessageID string `json:"client_message_id"`
-	Content         string `json:"content"`
+	ChannelID       uint   `json:"channel_id,omitempty"`
+	ConversationID  uint   `json:"conversation_id,omitempty"`
+	Conversation    string `json:"conversation,omitempty"`
+	ClientMessageID string `json:"client_message_id,omitempty"`
+	Content         string `json:"content,omitempty"`
 }
 
 type OutgoingMessage struct {
@@ -26,6 +28,6 @@ type MessageAck struct {
 	Type            string `json:"type"`
 	ClientMessageID string `json:"client_message_id"`
 	MessageID       uint   `json:"message_id"`
-	ChannelID       uint   `json:"channel_id"`
+	ChannelID       uint   `json:"channel_id,omitempty"`
 	ConversationID  uint   `json:"conversation_id,omitempty"`
 }
