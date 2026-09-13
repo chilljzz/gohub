@@ -2,24 +2,19 @@ server:
   port: 8081
   mode: debug
 
-
 mysql:
   host: 127.0.0.1
   port: 3306
-  username: root
-  password: "011110"
+  username: gohub_app
+  password: ""
   database: gohub
   charset: utf8mb4
 
-
 redis:
-  host: 127.0.0.1
-  port: 6381
   addr: "127.0.0.1:6381"
   password: ""
   db: 0
-  
 
 jwt:
-  secret: "golink-local-debelopment-secret-2026"
+  secret: ""
   expire_hours: 24

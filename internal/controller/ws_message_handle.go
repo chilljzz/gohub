@@ -86,9 +86,9 @@ func (h *WSMessageHandler) handleJoinChannle(
 
 	if err != nil {
 		h.handleMessageError(client, err)
+		return
 	}
 
-	h.manager.BindChannelConversation(req.ChannelID, conversation.ID)
 	h.manager.JoinConversation(conversation.ID, client)
 
 	userIDs := h.manager.RoomUserIDs(
@@ -102,9 +102,10 @@ func (h *WSMessageHandler) handleJoinChannle(
 	)
 
 	h.send(client, ws.OutgoingMessage{
-		Type:      "joined_conversation",
-		ChannelID: req.ChannelID,
-		Message:   "joined conversation successfully",
+		Type:           "joined_conversation",
+		ChannelID:      req.ChannelID,
+		ConversationID: conversation.ID,
+		Message:        "joined conversation successfully",
 	})
 }
 
@@ -122,6 +123,7 @@ func (h *WSMessageHandler) handleSendMessage(
 
 	if err != nil {
 		h.handleMessageError(client, err)
+		return
 	}
 
 	if !h.manager.IsInConversation(conversation.ID, client) {
@@ -195,14 +197,15 @@ func (h *WSMessageHandler) handleSendMessage(
 		return
 	}
 
-	if err := h.publishChannelMessage(
-		req.ChannelID,
+	if err := h.publishConversationMessage(
+		conversation.ID,
 		result,
 	); err != nil {
 		log.Printf(
-			"publish channel message failed: user_id=%d channel_id=%d err=%v",
+			"publish conversation message failed: "+
+				"user_id=%d conversation_id=%d err=%v",
 			client.UserID,
-			req.ChannelID,
+			conversation.ID,
 			err,
 		)
 		return
@@ -223,14 +226,16 @@ func (h *WSMessageHandler) handleLeaveChannel(
 
 	if err != nil {
 		h.handleMessageError(client, err)
+		return
 	}
 
 	h.manager.LeaveConversation(conversation.ID, client)
 
 	h.send(client, ws.OutgoingMessage{
-		Type:      "left_conversation",
-		ChannelID: req.ChannelID,
-		Message:   "left conversation successfully",
+		Type:           "left_conversation",
+		ChannelID:      req.ChannelID,
+		ConversationID: conversation.ID,
+		Message:        "left conversation successfully",
 	})
 
 }
@@ -261,8 +266,8 @@ func (h *WSMessageHandler) sendError(
 	})
 }
 
-func (h *WSMessageHandler) publishChannelMessage(
-	channelID uint,
+func (h *WSMessageHandler) publishConversationMessage(
+	conversationID uint,
 	payload []byte,
 ) error {
 	ctx, cancel := context.WithTimeout(
@@ -271,9 +276,9 @@ func (h *WSMessageHandler) publishChannelMessage(
 	)
 	defer cancel()
 
-	return h.broker.PublishChannel(
+	return h.broker.PublishConversation(
 		ctx,
-		channelID,
+		conversationID,
 		payload,
 	)
 }

@@ -175,30 +175,3 @@ func reverseMessageSlice(
 			messages[right], messages[left]
 	}
 }
-
-func (r *MessageRepository) CreateChannelCompat(
-	message *model.Message,
-	channelID uint,
-) error {
-	return r.db.Transaction(
-		func(tx *gorm.DB) error {
-			legacyMessage := &model.ChannelMessage{
-				ChannelID:       channelID,
-				SenderID:        message.SenderID,
-				ClientMessageID: message.ClientMessageID,
-				Content:         message.Content,
-			}
-			if err := tx.Create(legacyMessage).Error; err != nil {
-				return err
-			}
-			message.ID = legacyMessage.ID
-			message.CreatedAt = legacyMessage.CreatedAt
-
-			if err := tx.Create(message).Error; err != nil {
-				return nil
-			}
-
-			return nil
-		},
-	)
-}

@@ -199,6 +199,9 @@ func (s *ChannelMessageService) SyncMessagesAfter(
 	}
 
 	conversation, err := s.conversationService.GetChannelConversation(channelID)
+	if err != nil {
+		return nil, err
+	}
 
 	messages, hasMore, err := s.messageRepo.ListAfter(conversation.ID, afterID, limit)
 	if err != nil {

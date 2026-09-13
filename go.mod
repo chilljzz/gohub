@@ -11,6 +11,7 @@ require (
 	golang.org/x/crypto v0.53.0
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.31.2
+	github.com/joho/godotenv v1.5.1 
 )
 
 require (

@@ -51,7 +51,7 @@ func (s *ChannelReadService) MarkRead(
 
 	conversation, err := s.conversationService.GetChannelConversation(channelID)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	message, err := s.messageRepo.FindByID(messageID)
