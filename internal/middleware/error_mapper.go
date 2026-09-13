@@ -222,16 +222,6 @@ func mapError(err error) *apperror.AppError {
 
 	case errors.Is(
 		err,
-		service.ErrConversationCreateFailed,
-	):
-		return &apperror.AppError{
-			Code: response.CodeFail,
-			Msg:  "conversation create fail",
-			Err:  err,
-		}
-
-	case errors.Is(
-		err,
 		service.ErrCannotChatWithSelf,
 	):
 		return &apperror.AppError{
@@ -246,7 +236,17 @@ func mapError(err error) *apperror.AppError {
 	):
 		return &apperror.AppError{
 			Code: response.CodeDirectChatRequiresFriend,
-			Msg:  " not friends",
+			Msg:  "direct chat requires friendship",
+			Err:  err,
+		}
+
+	case errors.Is(
+		err,
+		service.ErrConversationAccessDenied,
+	):
+		return &apperror.AppError{
+			Code: response.CodeNotConversationMember,
+			Msg:  "conversation access denied",
 			Err:  err,
 		}
 

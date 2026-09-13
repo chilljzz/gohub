@@ -10,6 +10,8 @@ import (
 )
 
 type ConversationRepository interface {
+	FindByID(id uint) (*model.Conversation, error)
+
 	FindByChannelID(
 		channelID uint,
 	) (*model.Conversation, error)
@@ -28,6 +30,11 @@ type ConversationRepository interface {
 		otherUserID uint,
 	) error
 
+	IsMember(
+		conversationID uint,
+		userID uint,
+	) (bool, error)
+
 	// ListMembers(
 	// 	conversationID uint,
 	// ) ([]model.ConversationMember, error)
@@ -40,18 +47,28 @@ type FriendshipChecker interface {
 	) (bool, error)
 }
 
+type ChannelAccessChecker interface {
+	CheckChannelAccess(
+		userID uint,
+		channelID uint,
+	) error
+}
+
 type ConversationService struct {
-	conversationRepo ConversationRepository
-	friendChecker    FriendshipChecker
+	conversationRepo     ConversationRepository
+	friendChecker        FriendshipChecker
+	channelAccessChecker ChannelAccessChecker
 }
 
 func NewConversationService(
 	conversationRepo ConversationRepository,
 	friendChecker FriendshipChecker,
+	channelAccessChecker ChannelAccessChecker,
 ) *ConversationService {
 	return &ConversationService{
-		conversationRepo: conversationRepo,
-		friendChecker:    friendChecker,
+		conversationRepo:     conversationRepo,
+		friendChecker:        friendChecker,
+		channelAccessChecker: channelAccessChecker,
 	}
 }
 
@@ -60,9 +77,13 @@ var (
 
 	ErrCannotChatWithSelf = errors.New("cannot chat with self")
 
+	ErrConversationAccessDenied = errors.New("conversation access denied")
+
 	ErrDirectChatRequiresFriend = errors.New("direct chat requires friendship")
 
 	ErrConversationCreateFailed = errors.New("conversation create failed")
+
+	ErrInvalidConversationType = errors.New("invalid conversation type")
 )
 
 func (s *ConversationService) GetChannelConversation(
@@ -210,4 +231,50 @@ func toDirectConversationResult(
 		OtherUserID:    otherUserID,
 		CreatedAt:      conversation.CreatedAt,
 	}
+}
+
+func (s *ConversationService) GetAccessibleConversation(
+	userID uint,
+	conversationID uint,
+) (*model.Conversation, error) {
+	conversation, err := s.conversationRepo.FindByID(conversationID)
+	if err != nil {
+		return nil, err
+	}
+
+	if conversation == nil {
+		return nil, ErrConversationNotFound
+	}
+
+	switch conversation.Type {
+	case model.ConversationTypeDirect:
+		isMember, err := s.conversationRepo.IsMember(
+			conversationID,
+			userID,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+		if !isMember {
+			return nil, ErrConversationAccessDenied
+		}
+
+	case model.ConversationTypeChannel:
+		if conversation.ChannelID == nil {
+			return nil, ErrInvalidConversationType
+		}
+
+		if err := s.channelAccessChecker.CheckChannelAccess(
+			userID,
+			*conversation.ChannelID,
+		); err != nil {
+			return nil, err
+		}
+
+	default:
+		return nil, ErrInvalidConversationType
+	}
+
+	return conversation, nil
 }

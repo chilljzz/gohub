@@ -34,10 +34,15 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 	channelRepo := repository.NewChannelRepository()
 	// legacyMessageRepo := repository.NewChannelMessageRepository()
 	// readRepo := repository.NewChannelReadRepository()
+
+	realtimeService := service.NewRealtimeService(
+		channelRepo,
+		teamRepo,
+	)
 	conversation := repository.NewConversationRepository()
 	conversationReadRepo := repository.NewConversationReadRepository(db)
 
-	conversationService := service.NewConversationService(conversation, friendRepo)
+	conversationService := service.NewConversationService(conversation, friendRepo, realtimeService)
 
 	friendService := service.NewFriendService(
 		friendRepo,
@@ -53,15 +58,19 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 		channelRepo,
 		teamRepo,
 	)
-	realtimeService := service.NewRealtimeService(
-		channelRepo,
-		teamRepo,
-	)
+
 	messageService := service.NewChannelMessageService(
 		messageRepo,
 		realtimeService,
 		conversationService,
 	)
+
+	conversationMessageService :=
+		service.NewConversationMessageService(
+			messageRepo,
+			conversationService,
+		)
+
 	readService := service.NewChannelReadService(
 		conversationReadRepo,
 		messageRepo,
@@ -88,6 +97,7 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 		realtimeService,
 		messageService,
 		conversationService,
+		conversationMessageService,
 		broker,
 	)
 
@@ -103,6 +113,11 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 		readService,
 	)
 	conversationController := controller.NewConversationController(conversationService)
+
+	conversationMessageController :=
+		controller.NewConversationMessageController(
+			conversationMessageService,
+		)
 
 	api := r.Group("/api")
 
@@ -162,6 +177,16 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 		conversationGroup := auth.Group("/conversations")
 		{
 			conversationGroup.POST("/direct", conversationController.CreateDirect)
+
+			conversationGroup.GET(
+				"/:id/messages",
+				conversationMessageController.ListRecent,
+			)
+
+			conversationGroup.GET(
+				"/:id/messages/sync",
+				conversationMessageController.Sync,
+			)
 		}
 	}
 
