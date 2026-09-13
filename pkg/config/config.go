@@ -47,7 +47,8 @@ func InitConfig() error {
 
 	}
 
-	viper.SetConfigFile("configs/config.yaml")
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
 
 	viper.SetEnvPrefix("GOHUB")
 
@@ -86,7 +87,7 @@ func InitConfig() error {
 		var notFoundErr viper.ConfigFileNotFoundError
 
 		if !errors.As(err, &notFoundErr) {
-			return nil
+			return err
 		}
 	}
 
