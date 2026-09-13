@@ -24,7 +24,7 @@ type ConversationMessagePageResult struct {
 	HasMore bool `json:"has_more"`
 }
 
-type ConversationMEssageSyncResult struct {
+type ConversationMessageSyncResult struct {
 	Messages    []ConversationMessageResult `json:"messages"`
 	NextAfterID uint                        `json:"next_after_id"`
 	HasMore     bool                        `json:"has_more"`

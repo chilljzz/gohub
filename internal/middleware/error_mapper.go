@@ -236,7 +236,17 @@ func mapError(err error) *apperror.AppError {
 	):
 		return &apperror.AppError{
 			Code: response.CodeDirectChatRequiresFriend,
-			Msg:  " not friends",
+			Msg:  "direct chat requires friendship",
+			Err:  err,
+		}
+
+	case errors.Is(
+		err,
+		service.ErrConversationAccessDenied,
+	):
+		return &apperror.AppError{
+			Code: response.CodeNotConversationMember,
+			Msg:  "conversation access denied",
 			Err:  err,
 		}
 

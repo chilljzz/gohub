@@ -92,7 +92,7 @@ func (c *ConversationMessageController) Sync(ctx *gin.Context) {
 		response.Fail(
 			ctx,
 			response.CodeInvalidParam,
-			"invalid channel id",
+			"invalid conversation id",
 		)
 		return
 	}

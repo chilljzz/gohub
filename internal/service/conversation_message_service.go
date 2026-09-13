@@ -164,7 +164,7 @@ func (s *ConversationMessageService) SyncAfter(
 	conversationID uint,
 	afterID uint,
 	limit int,
-) (*dto.ConversationMEssageSyncResult, error) {
+) (*dto.ConversationMessageSyncResult, error) {
 	if limit <= 0 {
 		limit = 100
 	}
@@ -199,7 +199,7 @@ func (s *ConversationMessageService) SyncAfter(
 		nextAfterID = results[len(results)-1].ID
 	}
 
-	return &dto.ConversationMEssageSyncResult{
+	return &dto.ConversationMessageSyncResult{
 		Messages:    results,
 		NextAfterID: nextAfterID,
 		HasMore:     hasMore,

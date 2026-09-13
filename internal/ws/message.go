@@ -1,10 +1,10 @@
 package ws
 
 type IncomingMessage struct {
-	Type            string `json:"type"`
-	ChannelID       uint   `json:"channel_id,omitempty"`
-	ConversationID  uint   `json:"conversation_id,omitempty"`
-	Conversation    string `json:"conversation,omitempty"`
+	Type           string `json:"type"`
+	ChannelID      uint   `json:"channel_id,omitempty"`
+	ConversationID uint   `json:"conversation_id,omitempty"`
+	// Conversation    string `json:"conversation,omitempty"`
 	ClientMessageID string `json:"client_message_id,omitempty"`
 	Content         string `json:"content,omitempty"`
 }
