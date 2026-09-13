@@ -1,15 +1,15 @@
 package realtime
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/redis/go-redis/v9"
-	"golang.org/x/net/context"
 )
 
-const channelTopicPrefix = "gohub:channel:"
+const conversationTopicPrefix = "gohub:conversation:"
 
 type RedisBroker struct {
 	client *redis.Client
@@ -23,43 +23,43 @@ func NewRedisBroker(
 	}
 }
 
-func ChannelTopic(channelID uint) string {
+func ConversationTopic(conversationID uint) string {
 	return fmt.Sprintf(
 		"%s%d",
-		channelTopicPrefix,
-		channelID,
+		conversationTopicPrefix,
+		conversationID,
 	)
 }
 
-func ParseChannelTopic(
+func ParseConversationTopic(
 	topic string,
 ) (uint, error) {
 	if !strings.HasPrefix(
 		topic,
-		channelTopicPrefix,
+		conversationTopicPrefix,
 	) {
 		return 0, fmt.Errorf(
-			"incalid channel topic: %s",
+			"invalid conversation topic: %s",
 			topic,
 		)
 	}
 
 	idStr := strings.TrimPrefix(
 		topic,
-		channelTopicPrefix,
+		conversationTopicPrefix,
 	)
 	id, err := strconv.ParseUint(idStr, 10, 64)
 
 	if err != nil {
 		return 0, fmt.Errorf(
-			"parse channel id failed: %w",
+			"parse conversation id failed: %w",
 			err,
 		)
 	}
 
 	if id == 0 {
 		return 0, fmt.Errorf(
-			"invalid channel id: %d",
+			"invalid conversation id: %d",
 			id,
 		)
 	}
@@ -68,12 +68,19 @@ func ParseChannelTopic(
 
 }
 
-func (b *RedisBroker) PublishChannel(
+func (b *RedisBroker) PublishConversation(
 	ctx context.Context,
-	channelID uint,
+	conversationID uint,
 	message []byte,
 ) error {
-	topic := ChannelTopic(channelID)
+
+	if conversationID == 0 {
+		return fmt.Errorf(
+			"conversation id is required",
+		)
+	}
+
+	topic := ConversationTopic(conversationID)
 
 	return b.client.Publish(
 		ctx,
@@ -82,16 +89,16 @@ func (b *RedisBroker) PublishChannel(
 	).Err()
 }
 
-func (b *RedisBroker) SubscribeChannels(
+func (b *RedisBroker) SubscribeConversations(
 	ctx context.Context,
 	handler func(
-		channel string,
+		topic string,
 		payload []byte,
 	),
 ) error {
 	pubsub := b.client.PSubscribe(
 		ctx,
-		channelTopicPrefix+"*",
+		conversationTopicPrefix+"*",
 	)
 	defer pubsub.Close()
 

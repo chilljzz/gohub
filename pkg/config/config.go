@@ -1,6 +1,11 @@
 package config
 
-import "github.com/spf13/viper"
+import (
+	"strings"
+
+	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
+)
 
 type Config struct {
 	Server ServerConfig `mapstructure:"server"`
@@ -36,7 +41,45 @@ type JWTConfig struct {
 var Conf Config
 
 func InitConfig() error {
+
+	if err := godotenv.Load(); err != nil {
+
+	}
+
 	viper.SetConfigFile("configs/config.yaml")
+
+	viper.SetEnvPrefix("GOHUB")
+
+	viper.SetEnvKeyReplacer(
+		strings.NewReplacer(
+			".",
+			"_",
+		),
+	)
+
+	viper.AutomaticEnv()
+
+	bindings := map[string]string{
+		"server.port":      "GOHUB_SERVER_PORT",
+		"server.mode":      "GOHUB_SERVER_MODE",
+		"mysql.host":       "GOHUB_MYSQL_HOST",
+		"mysql.port":       "GOHUB_MYSQL_PORT",
+		"mysql.username":   "GOHUB_MYSQL_USERNAME",
+		"mysql.password":   "GOHUB_MYSQL_PASSWORD",
+		"mysql.database":   "GOHUB_MYSQL_DATABASE",
+		"mysql.charset":    "GOHUB_MYSQL_CHARSET",
+		"redis.addr":       "GOHUB_REDIS_ADDR",
+		"redis.password":   "GOHUB_REDIS_PASSWORD",
+		"redis.db":         "GOHUB_REDIS_DB",
+		"jwt.secret":       "GOHUB_JWT_SECRET",
+		"jwt.expire_hours": "GOHUB_JWT_EXPIRE_HOURS",
+	}
+
+	for key, env := range bindings {
+		if err := viper.BindEnv(key, env); err != nil {
+			return err
+		}
+	}
 
 	if err := viper.ReadInConfig(); err != nil {
 		return err

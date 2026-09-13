@@ -11,15 +11,12 @@ type Manager struct {
 	clients map[uint]*Client
 
 	rooms map[uint]map[*Client]struct{}
-
-	channelConversations map[uint]uint
 }
 
 func NewManager() *Manager {
 	return &Manager{
-		clients:              make(map[uint]*Client),
-		rooms:                make(map[uint]map[*Client]struct{}),
-		channelConversations: make(map[uint]uint),
+		clients: make(map[uint]*Client),
+		rooms:   make(map[uint]map[*Client]struct{}),
 	}
 }
 
@@ -114,8 +111,8 @@ func (m *Manager) IsInConversation(
 	ConversationID uint,
 	client *Client,
 ) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
 	room, ok := m.rooms[ConversationID]
 	if !ok {
@@ -185,39 +182,6 @@ func (m *Manager) removeFromRoomsLocked(
 		}
 	}
 
-}
-
-func (m *Manager) BindChannelConversation(
-	channelID uint,
-	conversationID uint,
-) {
-	if channelID == 0 || conversationID == 0 {
-		return
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.channelConversations[channelID] = conversationID
-}
-
-func (m *Manager) BroadcastChannelCompat(
-	channelID uint,
-	message []byte,
-) int {
-	m.mu.RLock()
-
-	conversationID, ok := m.channelConversations[channelID]
-
-	m.mu.RUnlock()
-	if !ok {
-		return 0
-	}
-
-	return m.BroadcastToConversation(
-		conversationID,
-		message,
-	)
 }
 
 func (m *Manager) RoomUserIDs(

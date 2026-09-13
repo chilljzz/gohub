@@ -1,0 +1,17 @@
+# Local configuration containing secrets
+/configs/config.yaml
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+
+# Build output
+/bin/
+*.exe
+*.out
+
+# IDE
+.vscode/
+.idea/

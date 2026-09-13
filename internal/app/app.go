@@ -52,27 +52,27 @@ func (a *App) startRedisSubscriber(
 			}
 
 		}()
-		err := a.broker.SubscribeChannels(
+		err := a.broker.SubscribeConversations(
 			ctx,
-			func(channel string, payload []byte) {
-				channelID, err := realtime.ParseChannelTopic(channel)
+			func(topic string, payload []byte) {
+				conversationID, err := realtime.ParseConversationTopic(topic)
 				if err != nil {
 					log.Printf(
-						"invalid redis channel=%s err=%v",
-						channel,
+						"invalid redis conversation=%s err=%v",
+						topic,
 						err,
 					)
 					return
 				}
 
-				count := a.manager.BroadcastChannelCompat(
-					channelID,
+				count := a.manager.BroadcastToConversation(
+					conversationID,
 					payload,
 				)
 
 				log.Printf(
-					"redis broadcast: channel_id=%d clients=%d",
-					channelID,
+					"redis broadcast: conversation_id=%d clients=%d",
+					conversationID,
 					count,
 				)
 			},
