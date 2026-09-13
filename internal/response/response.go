@@ -47,8 +47,7 @@ const (
 	CodeCannotChatWithSelf       = 42002
 	CodeDirectChatRequiresFriend = 42003
 	CodeNotConversationMember    = 42004
-	CodeInvalidConversationType  = 42005
-	CodeConversationConflict     = 42006
+	CodeConversationConflict     = 42005
 )
 
 func Success(ctx *gin.Context, data interface{}) {

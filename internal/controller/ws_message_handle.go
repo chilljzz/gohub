@@ -13,11 +13,12 @@ import (
 )
 
 type WSMessageHandler struct {
-	manager             *ws.Manager
-	realtimeService     *service.RealtimeService
-	messageService      *service.ChannelMessageService
-	conversationService *service.ConversationService
-	broker              *realtime.RedisBroker
+	manager                    *ws.Manager
+	realtimeService            *service.RealtimeService
+	messageService             *service.ChannelMessageService
+	conversationService        *service.ConversationService
+	conversationMessageService *service.ConversationMessageService
+	broker                     *realtime.RedisBroker
 }
 
 func NewWSMessageHandler(
@@ -25,14 +26,16 @@ func NewWSMessageHandler(
 	realtimeService *service.RealtimeService,
 	messageService *service.ChannelMessageService,
 	conversationService *service.ConversationService,
+	conversationMessageService *service.ConversationMessageService,
 	broker *realtime.RedisBroker,
 ) *WSMessageHandler {
 	return &WSMessageHandler{
-		manager:             manager,
-		realtimeService:     realtimeService,
-		messageService:      messageService,
-		conversationService: conversationService,
-		broker:              broker,
+		manager:                    manager,
+		realtimeService:            realtimeService,
+		messageService:             messageService,
+		conversationService:        conversationService,
+		conversationMessageService: conversationMessageService,
+		broker:                     broker,
 	}
 }
 
@@ -49,7 +52,7 @@ func (h *WSMessageHandler) Handle(
 
 	switch req.Type {
 	case "join_channel":
-		h.handleJoinChannle(client, req)
+		h.handleJoinChannel(client, req)
 
 	case "send_message":
 		h.handleSendMessage(client, req)
@@ -57,16 +60,31 @@ func (h *WSMessageHandler) Handle(
 	case "leave_channel":
 		h.handleLeaveChannel(client, req)
 
-	case "debug_panic":
-		panic("websocket read loop panic test")
+	case "join_conversation":
+		h.handleJoinConversation(
+			client,
+			req,
+		)
+
+	case "send_conversation_message":
+		h.handleSendConversationMessage(
+			client,
+			req,
+		)
+
+	case "leave_conversation":
+		h.handleLeaveConversation(
+			client,
+			req,
+		)
 
 	default:
-		h.sendError(client, "unkown message type")
+		h.sendError(client, "unknown message type")
 	}
 
 }
 
-func (h *WSMessageHandler) handleJoinChannle(
+func (h *WSMessageHandler) handleJoinChannel(
 	client *ws.Client,
 	req ws.IncomingMessage,
 ) {
@@ -241,6 +259,156 @@ func (h *WSMessageHandler) handleLeaveChannel(
 
 }
 
+func (h *WSMessageHandler) handleJoinConversation(
+	client *ws.Client,
+	req ws.IncomingMessage,
+) {
+	if req.ConversationID == 0 {
+		h.sendError(
+			client,
+			"conversation_id is required",
+		)
+		return
+	}
+
+	conversation, err := h.conversationService.
+		GetAccessibleConversation(client.UserID, req.ConversationID)
+	if err != nil {
+		h.handleMessageError(client, err)
+		return
+	}
+
+	h.manager.JoinConversation(conversation.ID, client)
+
+	h.send(
+		client,
+		ws.OutgoingMessage{
+			Type: "joined_conversation",
+
+			ConversationID: conversation.ID,
+
+			Message: "joined conversation successfully",
+		},
+	)
+}
+
+func (h *WSMessageHandler) handleSendConversationMessage(
+	client *ws.Client,
+	req ws.IncomingMessage,
+) {
+	if req.ConversationID == 0 {
+		h.sendError(
+			client,
+			"conversation_id is required",
+		)
+		return
+	}
+
+	if !h.manager.IsInConversation(req.ConversationID, client) {
+		h.sendError(
+			client,
+			"not joined conversation",
+		)
+
+		return
+	}
+
+	result, err := h.conversationMessageService.CreateMessage(
+		client.UserID,
+		req.ConversationID,
+		req.Content,
+		req.ClientMessageID,
+	)
+
+	if err != nil {
+		h.handleMessageError(
+			client,
+			err,
+		)
+		return
+	}
+
+	message := result.Message
+
+	ack := ws.MessageAck{
+		Type:            "message_ack",
+		ClientMessageID: message.ClientMessageID,
+		MessageID:       message.ID,
+		ConversationID:  message.ConversationID,
+	}
+
+	ackPayload, err := json.Marshal(ack)
+
+	if err != nil {
+		return
+	}
+
+	client.SendMessage(ackPayload)
+
+	if !result.Created {
+		return
+	}
+
+	outgoing := ws.OutgoingMessage{
+		Type:           "conversation_message",
+		MessageID:      message.ID,
+		ConversationID: message.ConversationID,
+		UserID:         message.SenderID,
+		Content:        message.Content,
+		SentAt:         message.CreatedAt.UTC().Format(time.RFC3339),
+	}
+
+	payload, err := json.Marshal(outgoing)
+
+	if err != nil {
+		h.sendError(client, "internal server error")
+		return
+	}
+
+	if err := h.publishConversationMessage(message.ConversationID, payload); err != nil {
+		log.Printf(
+			"publish conversation message failed: "+
+				"user_id=%d conversation_id=%d err=%v",
+			client.UserID,
+			message.ConversationID,
+			err,
+		)
+	}
+
+}
+
+func (h *WSMessageHandler) handleLeaveConversation(
+	client *ws.Client,
+	req ws.IncomingMessage,
+) {
+
+	if req.ConversationID == 0 {
+
+		h.sendError(
+			client,
+			"conversation_id is required",
+		)
+
+		return
+	}
+
+	h.manager.LeaveConversation(
+		req.ConversationID,
+		client,
+	)
+
+	h.send(
+		client,
+		ws.OutgoingMessage{
+			Type: "left_conversation",
+
+			ConversationID: req.ConversationID,
+
+			Message: "left conversation successfully",
+		},
+	)
+}
+
 func (h *WSMessageHandler) send(
 	client *ws.Client,
 	message ws.OutgoingMessage,
@@ -294,7 +462,10 @@ func (h *WSMessageHandler) handleMessageError(
 		errors.Is(err, service.ErrChannelNotFound),
 		errors.Is(err, service.ErrNotTeamMember),
 		errors.Is(err, service.ErrInvalidClientMessageID),
-		errors.Is(err, service.ErrClientMessageConflict):
+		errors.Is(err, service.ErrClientMessageConflict),
+		errors.Is(err, service.ErrConversationNotFound),
+		errors.Is(err, service.ErrConversationAccessDenied),
+		errors.Is(err, service.ErrInvalidConversationType):
 
 		h.sendError(client, err.Error())
 
