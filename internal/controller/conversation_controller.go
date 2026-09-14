@@ -56,3 +56,45 @@ func (c *ConversationController) CreateDirect(
 		conversation,
 	)
 }
+
+func (c *ConversationController) List(ctx *gin.Context) {
+	userID, ok := getCurrentUserID(ctx)
+
+	if !ok {
+
+		response.Fail(
+			ctx,
+			response.CodeUnauthorized,
+			"user identity not found",
+		)
+
+		return
+	}
+
+	var query request.ListConversationQuery
+
+	if err := ctx.ShouldBindQuery(&query); err != nil {
+		response.Fail(
+			ctx,
+			response.CodeInvalidParam,
+			"invalid query parameters",
+		)
+		return
+	}
+
+	result, err := c.conversationService.ListConversations(
+		userID,
+		query.Limit,
+		query.Cursor,
+	)
+	if err != nil {
+		ctx.Error(err)
+		ctx.Abort()
+		return
+	}
+
+	response.Success(
+		ctx,
+		result,
+	)
+}

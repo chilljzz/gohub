@@ -38,7 +38,7 @@ func (c *ConversationMessageController) ListRecent(ctx *gin.Context) {
 		response.Fail(
 			ctx,
 			response.CodeInvalidParam,
-			"invalid channel id",
+			"invalid conversation id",
 		)
 		return
 	}
