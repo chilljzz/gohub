@@ -145,18 +145,20 @@ func (r *MessageRepository) ListAfter(
 
 }
 
-func (r *MessageRepository) CountAfter(
+func (r *MessageRepository) CountUnreadAfter(
 	conversationID uint,
 	messageID uint,
+	userID uint,
 ) (int64, error) {
 	var count int64
 
 	err := r.db.
 		Model(&model.Message{}).
 		Where(
-			"conversation_id = ? AND id > ?",
+			"conversation_id = ? AND id > ? AND sender_id <> ?",
 			conversationID,
 			messageID,
+			userID,
 		).
 		Count(&count).
 		Error

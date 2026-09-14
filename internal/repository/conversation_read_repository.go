@@ -39,7 +39,7 @@ func (r *ConversationReadRepository) Find(
 	}
 
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	return &read, nil

@@ -252,21 +252,11 @@ func mapError(err error) *apperror.AppError {
 
 	case errors.Is(
 		err,
-		service.ErrDirectChatRequiresFriend,
+		service.ErrInvalidConversationCursor,
 	):
 		return &apperror.AppError{
-			Code: response.CodeDirectChatRequiresFriend,
-			Msg:  "direct chat requires friendship",
-			Err:  err,
-		}
-
-	case errors.Is(
-		err,
-		service.ErrConversationAccessDenied,
-	):
-		return &apperror.AppError{
-			Code: response.CodeNotConversationMember,
-			Msg:  "conversation access denied",
+			Code: response.CodeInvalidParam,
+			Msg:  "invalid conversation cursor",
 			Err:  err,
 		}
 

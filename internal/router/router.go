@@ -39,7 +39,7 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 		channelRepo,
 		teamRepo,
 	)
-	conversation := repository.NewConversationRepository()
+	conversation := repository.NewConversationRepository(db)
 	conversationReadRepo := repository.NewConversationReadRepository(db)
 
 	conversationService := service.NewConversationService(conversation, friendRepo, realtimeService)
@@ -186,6 +186,10 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 			conversationGroup.GET(
 				"/:id/messages/sync",
 				conversationMessageController.Sync,
+			)
+			conversationGroup.GET(
+				"",
+				conversationController.List,
 			)
 		}
 	}

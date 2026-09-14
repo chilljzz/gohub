@@ -102,9 +102,10 @@ func (s *ChannelReadService) GetUnreadCount(
 		lastReadMessageID = read.LastReadMessageID
 	}
 
-	count, err := s.messageRepo.CountAfter(
+	count, err := s.messageRepo.CountUnreadAfter(
 		conversation.ID,
 		lastReadMessageID,
+		userID,
 	)
 	if err != nil {
 		return nil, err
