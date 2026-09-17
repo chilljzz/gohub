@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"log"
 	"runtime/debug"
 	"sync"
@@ -14,8 +15,9 @@ type Client struct {
 	Conn   *websocket.Conn
 	Send   chan []byte
 
-	manager *Manager
-	handler MessageHandler
+	manager  *Manager
+	handler  MessageHandler
+	presence PresenceTracker
 
 	closed    chan struct{}
 	closeOnce sync.Once
@@ -26,14 +28,16 @@ func NewClient(
 	conn *websocket.Conn,
 	manager *Manager,
 	handler MessageHandler,
+	presence PresenceTracker,
 ) *Client {
 	return &Client{
-		UserID:  userID,
-		Conn:    conn,
-		Send:    make(chan []byte, 256),
-		manager: manager,
-		handler: handler,
-		closed:  make(chan struct{}),
+		UserID:   userID,
+		Conn:     conn,
+		Send:     make(chan []byte, 256),
+		manager:  manager,
+		handler:  handler,
+		presence: presence,
+		closed:   make(chan struct{}),
 	}
 }
 
@@ -83,6 +87,16 @@ func (c *Client) ReadLoop() {
 
 	c.Conn.SetPongHandler(
 		func(string) error {
+
+			if c.presence != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				err := c.presence.Touch(ctx, c.UserID)
+				cancel()
+				if err != nil {
+					log.Printf("presence touch failed: user_id=%d err=%v", c.UserID, err)
+				}
+			}
+
 			log.Printf(
 				"user %d pong received\n",
 				c.UserID,

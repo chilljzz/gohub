@@ -1,10 +1,12 @@
 package service
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/chilljzz/gohub/internal/dto"
 	"github.com/chilljzz/gohub/internal/model"
@@ -64,6 +66,13 @@ type ChannelAccessChecker interface {
 	) error
 }
 
+type PresenceReader interface {
+	GetMany(
+		ctx context.Context,
+		userIDs []uint,
+	) (map[uint]PresenceStatus, error)
+}
+
 type conversationListCursor struct {
 	LastMessageID uint `json:"m"`
 
@@ -74,17 +83,21 @@ type ConversationService struct {
 	conversationRepo     ConversationRepository
 	friendChecker        FriendshipChecker
 	channelAccessChecker ChannelAccessChecker
+
+	presenceReader PresenceReader
 }
 
 func NewConversationService(
 	conversationRepo ConversationRepository,
 	friendChecker FriendshipChecker,
 	channelAccessChecker ChannelAccessChecker,
+	presenceReader PresenceReader,
 ) *ConversationService {
 	return &ConversationService{
 		conversationRepo:     conversationRepo,
 		friendChecker:        friendChecker,
 		channelAccessChecker: channelAccessChecker,
+		presenceReader:       presenceReader,
 	}
 }
 
@@ -298,6 +311,7 @@ func (s *ConversationService) GetAccessibleConversation(
 }
 
 func (s *ConversationService) ListConversations(
+	ctx context.Context,
 	userID uint,
 	limit int,
 	cursorText string,
@@ -332,8 +346,38 @@ func (s *ConversationService) ListConversations(
 
 	rows, hasMore, err := s.conversationRepo.
 		ListForUser(userID, cursorLastMessageID, cursorConversationID, hasCursor, limit)
+
 	if err != nil {
 		return nil, err
+	}
+	peerIDs := make([]uint, 0, len(rows))
+	peerIDSet := make(map[uint]struct{})
+	for i := range rows {
+		row := &rows[i]
+
+		if row.Type != model.ConversationTypeDirect {
+			continue
+		}
+		if row.PeerUserID == nil {
+			continue
+		}
+
+		peerID := *row.PeerUserID
+		if _, exists := peerIDSet[peerID]; exists {
+			continue
+		}
+		peerIDSet[peerID] = struct{}{}
+
+		peerIDs = append(peerIDs, peerID)
+	}
+	presenceMap := make(map[uint]PresenceStatus)
+	if s.presenceReader != nil && len(peerIDs) > 0 {
+		statuses, err := s.presenceReader.GetMany(ctx, peerIDs)
+		if err != nil {
+			log.Printf("get presence failed: %v", err)
+		} else {
+			presenceMap = statuses
+		}
 	}
 
 	items := make([]dto.ConversationListItem, 0, len(rows))
@@ -342,6 +386,14 @@ func (s *ConversationService) ListConversations(
 		item, err := toConversationListItem(&rows[i])
 		if err != nil {
 			return nil, err
+		}
+		if item.Peer != nil {
+			peerID := item.Peer.ID
+
+			if presence, ok := presenceMap[peerID]; ok {
+				item.Peer.Online = presence.Online
+				item.Peer.LastSeenAt = presence.LastSeenAt
+			}
 		}
 
 		items = append(items, item)

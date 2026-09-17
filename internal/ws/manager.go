@@ -8,80 +8,117 @@ import (
 type Manager struct {
 	mu sync.RWMutex
 
-	clients map[uint]*Client
+	clients map[uint]map[*Client]struct{}
 
 	rooms map[uint]map[*Client]struct{}
 }
 
 func NewManager() *Manager {
 	return &Manager{
-		clients: make(map[uint]*Client),
+		clients: make(map[uint]map[*Client]struct{}),
 		rooms:   make(map[uint]map[*Client]struct{}),
 	}
 }
 
 func (m *Manager) Register(client *Client) {
+
 	m.mu.Lock()
 
-	oldClient := m.clients[client.UserID]
-	if oldClient != nil {
-		m.removeFromRoomsLocked(oldClient)
-	}
-	m.clients[client.UserID] = client
+	userClients := m.clients[client.UserID]
 
+	if userClients == nil {
+		userClients = make(map[*Client]struct{})
+		m.clients[client.UserID] = userClients
+	}
+	userClients[client] = struct{}{}
+	userCount := len(m.clients)
+	connectionCount := m.connectionCountLocked()
 	m.mu.Unlock()
 
-	if oldClient != nil {
-		oldClient.Close()
-	}
-
 	log.Printf(
-		"user %d registered,online count=%d\n",
+		"user %d connection registered, users=%d connections=%d",
 		client.UserID,
-		m.onlineCount(),
+		userCount,
+		connectionCount,
 	)
+
 }
 
 func (m *Manager) Unregister(client *Client) {
 	m.mu.Lock()
 
-	currentClient, ok := m.clients[client.UserID]
-	isCurrent := ok && currentClient == client
+	removed := false
 
-	if isCurrent {
-		delete(m.clients, client.UserID)
+	if userClients := m.clients[client.UserID]; userClients != nil {
+		if _, exists := userClients[client]; exists {
+			delete(userClients, client)
+		}
+
+		removed = true
+
+		if len(userClients) == 0 {
+			delete(m.clients, client.UserID)
+		}
 	}
 	m.removeFromRoomsLocked(client)
 
+	userCount := len(m.clients)
+
+	connectionCount := m.connectionCountLocked()
+
 	m.mu.Unlock()
 
-	if isCurrent {
-
+	if removed {
 		log.Printf(
-			"user %d unregistered,online count=%d\n",
+			"user %d connection unregistered, users=%d connections=%d",
 			client.UserID,
-			m.onlineCount(),
+			userCount,
+			connectionCount,
 		)
 	}
+
+}
+func (m *Manager) connectionCountLocked() int {
+	count := 0
+
+	for _, userClients := range m.clients {
+
+		count += len(userClients)
+	}
+
+	return count
 }
 
-func (m *Manager) Get(userID uint) (*Client, bool) {
+func (m *Manager) GetClients(userID uint) []*Client {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
+	userClients := m.clients[userID]
+	clients := make([]*Client, 0, len(userClients))
 
-	Client, OK := m.clients[userID]
-	return Client, OK
+	for client := range userClients {
+		clients = append(clients, client)
+	}
+
+	m.mu.RUnlock()
+
+	return clients
 }
 
 func (m *Manager) SendToUser(
 	userID uint,
 	message []byte,
 ) bool {
-	client, ok := m.Get(userID)
-	if !ok {
+	clients := m.GetClients(userID)
+	if len(clients) == 0 {
 		return false
 	}
-	return client.SendMessage(message)
+	sent := false
+	for _, client := range clients {
+		if client.SendMessage(message) {
+			sent = true
+		}
+	}
+
+	return sent
 }
 
 func (m *Manager) onlineCount() int {
@@ -190,19 +227,19 @@ func (m *Manager) RoomUserIDs(
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	room, ok := m.rooms[conversationID]
-	if !ok {
+	room := m.rooms[conversationID]
+	if room == nil {
 		return nil
 	}
 
-	userIDs := make([]uint, 0, len(room))
+	userSet := make(map[uint]struct{})
 
 	for client := range room {
-		userIDs = append(
-			userIDs,
-			client.UserID,
-		)
+		userSet[client.UserID] = struct{}{}
 	}
-
+	userIDs := make([]uint, 0, len(userSet))
+	for userID := range userSet {
+		userIDs = append(userIDs, userID)
+	}
 	return userIDs
 }
