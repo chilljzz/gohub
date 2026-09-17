@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/chilljzz/gohub/internal/response"
 	"github.com/chilljzz/gohub/internal/ws"
@@ -19,17 +21,20 @@ var upgrade = websocket.Upgrader{
 }
 
 type WSController struct {
-	manager *ws.Manager
-	handler ws.MessageHandler
+	manager  *ws.Manager
+	handler  ws.MessageHandler
+	presence ws.PresenceTracker
 }
 
 func NewWSController(
 	manager *ws.Manager,
 	handler ws.MessageHandler,
+	presence ws.PresenceTracker,
 ) *WSController {
 	return &WSController{
-		manager: manager,
-		handler: handler,
+		manager:  manager,
+		handler:  handler,
+		presence: presence,
 	}
 }
 
@@ -59,8 +64,15 @@ func (c *WSController) Connect(ctx *gin.Context) {
 		conn,
 		c.manager,
 		c.handler,
+		c.presence,
 	)
 	c.manager.Register(client)
+
+	touchCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	if err := c.presence.Touch(touchCtx, userID); err != nil {
+		log.Printf("initial presence touch failed: user_id=%d err=%v", userID, err)
+	}
+	cancel()
 
 	go client.WriteLoop()
 

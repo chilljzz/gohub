@@ -7,6 +7,10 @@ type ConversationPeerResult struct {
 	Username string `json:"username"`
 	Nickname string `json:"nickname"`
 	Avatar   string `json:"avatar"`
+
+	Online bool `json:"online"`
+
+	LastSeenAt *time.Time `json:"last_seen_at,omitempty"`
 }
 
 type ConversationChannelResult struct {

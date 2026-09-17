@@ -83,6 +83,7 @@ func (c *ConversationController) List(ctx *gin.Context) {
 	}
 
 	result, err := c.conversationService.ListConversations(
+		ctx.Request.Context(),
 		userID,
 		query.Limit,
 		query.Cursor,

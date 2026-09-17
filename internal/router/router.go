@@ -1,6 +1,8 @@
 package router
 
 import (
+	"time"
+
 	"github.com/chilljzz/gohub/internal/controller"
 	"github.com/chilljzz/gohub/internal/database"
 	"github.com/chilljzz/gohub/internal/middleware"
@@ -32,6 +34,10 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 	friendRepo := repository.NewFriendREpository()
 	teamRepo := repository.NewTeamRepository()
 	channelRepo := repository.NewChannelRepository()
+	presenceRepo :=
+		repository.NewPresenceRepository(
+			database.RedisClient,
+		)
 	// legacyMessageRepo := repository.NewChannelMessageRepository()
 	// readRepo := repository.NewChannelReadRepository()
 
@@ -39,10 +45,20 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 		channelRepo,
 		teamRepo,
 	)
+	presenceService :=
+		service.NewPresenceService(
+			presenceRepo,
+			90*time.Second,
+		)
 	conversation := repository.NewConversationRepository(db)
 	conversationReadRepo := repository.NewConversationReadRepository(db)
 
-	conversationService := service.NewConversationService(conversation, friendRepo, realtimeService)
+	conversationService := service.NewConversationService(
+		conversation,
+		friendRepo,
+		realtimeService,
+		presenceService,
+	)
 
 	friendService := service.NewFriendService(
 		friendRepo,
@@ -104,6 +120,7 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 	wsController := controller.NewWSController(
 		wsManager,
 		wsMessageHandler,
+		presenceService,
 	)
 
 	messageController := controller.NewChannelMessageController(
