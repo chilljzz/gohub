@@ -18,3 +18,12 @@ redis:
 jwt:
   secret: ""
   expire_hours: 24
+
+
+kafka:
+  brokers:
+    - ""
+
+  message_created_topic: ""
+
+  consumer_group: ""

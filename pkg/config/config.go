@@ -13,6 +13,7 @@ type Config struct {
 	Mysql  MySQLConfig  `mapstructure:"mysql"`
 	JWT    JWTConfig    `mapstructure:"jwt"`
 	Redis  RedisConfig  `mapstructure:"redis"`
+	Kafka  KafkaConfig  `mapstructure:"kafka"`
 }
 type RedisConfig struct {
 	Addr     string `mapstructure:"addr"`
@@ -39,6 +40,14 @@ type JWTConfig struct {
 	ExpireHours int    `mapstructure:"expire_hours"`
 }
 
+type KafkaConfig struct {
+	Brokers []string `mapstructure:"brokers"`
+
+	MessageCreatedTopic string `mapstructure:"message_created_topic"`
+
+	ConsumerGroup string `mapstructure:"consumer_group"`
+}
+
 var Conf Config
 
 func InitConfig() error {
@@ -62,19 +71,26 @@ func InitConfig() error {
 	viper.AutomaticEnv()
 
 	bindings := map[string]string{
-		"server.port":      "GOHUB_SERVER_PORT",
-		"server.mode":      "GOHUB_SERVER_MODE",
-		"mysql.host":       "GOHUB_MYSQL_HOST",
-		"mysql.port":       "GOHUB_MYSQL_PORT",
-		"mysql.username":   "GOHUB_MYSQL_USERNAME",
-		"mysql.password":   "GOHUB_MYSQL_PASSWORD",
-		"mysql.database":   "GOHUB_MYSQL_DATABASE",
-		"mysql.charset":    "GOHUB_MYSQL_CHARSET",
-		"redis.addr":       "GOHUB_REDIS_ADDR",
-		"redis.password":   "GOHUB_REDIS_PASSWORD",
-		"redis.db":         "GOHUB_REDIS_DB",
+		"server.port": "GOHUB_SERVER_PORT",
+		"server.mode": "GOHUB_SERVER_MODE",
+
+		"mysql.host":     "GOHUB_MYSQL_HOST",
+		"mysql.port":     "GOHUB_MYSQL_PORT",
+		"mysql.username": "GOHUB_MYSQL_USERNAME",
+		"mysql.password": "GOHUB_MYSQL_PASSWORD",
+		"mysql.database": "GOHUB_MYSQL_DATABASE",
+		"mysql.charset":  "GOHUB_MYSQL_CHARSET",
+
+		"redis.addr":     "GOHUB_REDIS_ADDR",
+		"redis.password": "GOHUB_REDIS_PASSWORD",
+		"redis.db":       "GOHUB_REDIS_DB",
+
 		"jwt.secret":       "GOHUB_JWT_SECRET",
 		"jwt.expire_hours": "GOHUB_JWT_EXPIRE_HOURS",
+
+		"kafka.brokers":               "GOHUB_KAFKA_BROKERS",
+		"kafka.message_created_topic": "GOHUB_KAFKA_MESSAGE_CREATED_TOPIC",
+		"kafka.consumer_group":        "GOHUB_KAFKA_CONSUMER_GROUP",
 	}
 
 	for key, env := range bindings {

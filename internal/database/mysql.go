@@ -8,7 +8,6 @@ import (
 	"github.com/chilljzz/gohub/pkg/config"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 var DB *gorm.DB
@@ -29,7 +28,6 @@ func InitMySQL(c config.MySQLConfig) error {
 		mysql.Open(dsn),
 		&gorm.Config{
 			TranslateError: true,
-			Logger:         logger.Default.LogMode(logger.Info),
 		})
 	if err != nil {
 		return err

@@ -24,7 +24,10 @@ func main() {
 		log.Fatalf("init redis failed: %v", err)
 	}
 
-	application := app.New()
+	application, err := app.New()
+	if err != nil {
+		log.Fatalf("init app failed: %v", err)
+	}
 
 	ctx := context.Background()
 	if err := application.Run(ctx); err != nil {

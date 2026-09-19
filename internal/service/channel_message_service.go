@@ -27,6 +27,7 @@ type ChannelMessageService struct {
 	messageRepo         *repository.MessageRepository
 	realtimeService     *RealtimeService
 	conversationService *ConversationService
+	eventPublisher      MessageEventPublisher
 }
 
 type CreateMessageResult struct {
@@ -38,11 +39,13 @@ func NewChannelMessageService(
 	messageRepo *repository.MessageRepository,
 	realtimeService *RealtimeService,
 	conversationService *ConversationService,
+	eventPublisher MessageEventPublisher,
 ) *ChannelMessageService {
 	return &ChannelMessageService{
 		messageRepo:         messageRepo,
 		realtimeService:     realtimeService,
 		conversationService: conversationService,
+		eventPublisher:      eventPublisher,
 	}
 }
 
@@ -92,6 +95,12 @@ func (s *ChannelMessageService) CreateChannelMessage(
 	err = s.messageRepo.Create(message)
 
 	if err == nil {
+
+		publishMessageCreatedBestEffort(
+			s.eventPublisher,
+			message,
+		)
+
 		result := toChannelMessageResult(
 			message,
 			channelID,

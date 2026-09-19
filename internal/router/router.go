@@ -14,7 +14,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine {
+func InitRouter(
+	broker *realtime.RedisBroker,
+	wsManager *ws.Manager,
+	messageEventPublisher service.MessageEventPublisher,
+) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger())
 	r.Use(middleware.ErrorMiddleware())
@@ -79,12 +83,14 @@ func InitRouter(broker *realtime.RedisBroker, wsManager *ws.Manager) *gin.Engine
 		messageRepo,
 		realtimeService,
 		conversationService,
+		messageEventPublisher,
 	)
 
 	conversationMessageService :=
 		service.NewConversationMessageService(
 			messageRepo,
 			conversationService,
+			messageEventPublisher,
 		)
 
 	readService := service.NewChannelReadService(

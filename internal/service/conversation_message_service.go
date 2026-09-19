@@ -14,16 +14,20 @@ import (
 type ConversationMessageService struct {
 	messageRepo         *repository.MessageRepository
 	conversationService *ConversationService
+	eventPublisher      MessageEventPublisher
 }
 
 func NewConversationMessageService(
 	messageRepo *repository.MessageRepository,
 	conversationService *ConversationService,
+	eventPublisher MessageEventPublisher,
 ) *ConversationMessageService {
 	return &ConversationMessageService{
 		messageRepo: messageRepo,
 
 		conversationService: conversationService,
+
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -76,6 +80,9 @@ func (s *ConversationMessageService) CreateMessage(
 	)
 
 	if err == nil {
+
+		publishMessageCreatedBestEffort(s.eventPublisher, message)
+
 		return &CreateConversationMessageResult{
 			Message: toConversationMessageResult(message),
 			Created: true,
