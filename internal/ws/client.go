@@ -59,6 +59,13 @@ func (c *Client) Close() {
 }
 
 func (c *Client) SendMessage(message []byte) bool {
+
+	select {
+	case <-c.closed:
+		return false
+	default:
+	}
+
 	select {
 	case c.Send <- message:
 		return true

@@ -250,6 +250,8 @@ func (r *ConversationRepository) ListForUser(
 			m.conversation_id,
 			COUNT(*) AS unread_count
 		FROM messages m
+		INNER JOIN visible_conversations vc
+    		ON vc.conversation_id = m.conversation_id
 		LEFT JOIN user_reads ur
 			ON ur.conversation_id = m.conversation_id
 		WHERE 
@@ -321,7 +323,6 @@ func (r *ConversationRepository) ListForUser(
 
 	WHERE(
 		? = 0 
-		OR COALESCE(lmd.id,0) < 0
 		OR COALESCE(lmd.id,0) < ?
 		OR (COALESCE(lmd.id,0) = ? AND c.id < ?)
 	)

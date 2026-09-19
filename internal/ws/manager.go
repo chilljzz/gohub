@@ -52,9 +52,8 @@ func (m *Manager) Unregister(client *Client) {
 	if userClients := m.clients[client.UserID]; userClients != nil {
 		if _, exists := userClients[client]; exists {
 			delete(userClients, client)
+			removed = true
 		}
-
-		removed = true
 
 		if len(userClients) == 0 {
 			delete(m.clients, client.UserID)
