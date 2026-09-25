@@ -50,20 +50,85 @@ func (r *ConversationReadRepository) UpsertLastRead(
 	userID uint,
 	messageID uint,
 ) error {
+
+	return r.UpsertRead(
+		conversationID,
+		userID,
+		messageID,
+	)
+}
+
+func (r *ConversationReadRepository) UpsertDelivered(
+	conversationID uint,
+	userID uint,
+	messageID uint,
+) error {
 	const query = `
-		INSERT INTO conversation_reads (
+		INSERT INTO conversation_reads(
 			conversation_id,
 			user_id,
+			last_delivered_message_id,
 			last_read_message_id,
 			created_at,
 			updated_at
 		)
-		VALUES(?,?,?,NOW(),NOW())
-		ON DUPLICATE KEY UPDATE
-			last_read_message_id = 
-				GREATEST(last_read_message_id,?),
+		VALUES(?,?,?,0,NOW(),NOW())
+		ON DUPLICATE KEY UPDATE 
+			last_delivered_message_id = 
+				GREATEST(
+					last_delivered_message_id,
+					?
+				),
+
 			updated_at = NOW()
 	`
 
 	return r.db.Exec(query, conversationID, userID, messageID, messageID).Error
+}
+
+func (r *ConversationReadRepository) UpsertRead(
+	conversationID uint,
+	userID uint,
+	messageID uint,
+) error {
+	const query = `
+		INSERT INTO conversation_reads (
+			conversation_id,
+			user_id,
+			last_delivered_message_id,
+			last_read_message_id,
+			created_at,
+			updated_at
+		)
+		VALUES (?, ?, ?, ?, NOW(), NOW())
+	ON DUPLICATE KEY UPDATE
+
+			last_delivered_message_id =
+				GREATEST(
+					last_delivered_message_id,
+					?
+				),
+
+			last_read_message_id =
+				GREATEST(
+					last_read_message_id,
+					?
+				),
+
+			updated_at = NOW()
+	`
+
+	return r.db.Exec(
+		query,
+
+		conversationID,
+		userID,
+
+		messageID,
+		messageID,
+
+		messageID,
+		messageID,
+	).Error
+
 }

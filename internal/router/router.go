@@ -100,6 +100,12 @@ func InitRouter(
 		conversationService,
 	)
 
+	directReceiptService := service.NewDirectReceiptService(
+		conversationReadRepo,
+		messageRepo,
+		conversationService,
+	)
+
 	userController := controller.NewUserController()
 
 	friendController := controller.NewFriendController(
@@ -120,6 +126,7 @@ func InitRouter(
 		messageService,
 		conversationService,
 		conversationMessageService,
+		directReceiptService,
 		broker,
 	)
 
@@ -141,6 +148,10 @@ func InitRouter(
 		controller.NewConversationMessageController(
 			conversationMessageService,
 		)
+
+	directReceiptController := controller.NewDirectReceiptController(
+		directReceiptService,
+	)
 
 	api := r.Group("/api")
 
@@ -213,6 +224,10 @@ func InitRouter(
 			conversationGroup.GET(
 				"",
 				conversationController.List,
+			)
+			conversationGroup.GET(
+				"/:id/receipt-state",
+				directReceiptController.ReceiptState,
 			)
 		}
 	}
