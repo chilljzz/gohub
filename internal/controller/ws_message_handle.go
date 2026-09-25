@@ -559,6 +559,7 @@ func (h *WSMessageHandler) publishDirectReceipt(
 			"publish receipt failed: conversation_id=%d message_id=%d err=%v",
 			result.ConversationID,
 			result.MessageID,
+			err,
 		)
 
 		return
