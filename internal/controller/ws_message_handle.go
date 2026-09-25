@@ -18,6 +18,7 @@ type WSMessageHandler struct {
 	messageService             *service.ChannelMessageService
 	conversationService        *service.ConversationService
 	conversationMessageService *service.ConversationMessageService
+	directReceiptService       *service.DirectReceiptService
 	broker                     *realtime.RedisBroker
 }
 
@@ -27,7 +28,9 @@ func NewWSMessageHandler(
 	messageService *service.ChannelMessageService,
 	conversationService *service.ConversationService,
 	conversationMessageService *service.ConversationMessageService,
+	directReceiptService *service.DirectReceiptService,
 	broker *realtime.RedisBroker,
+
 ) *WSMessageHandler {
 	return &WSMessageHandler{
 		manager:                    manager,
@@ -36,6 +39,7 @@ func NewWSMessageHandler(
 		conversationService:        conversationService,
 		conversationMessageService: conversationMessageService,
 		broker:                     broker,
+		directReceiptService:       directReceiptService,
 	}
 }
 
@@ -43,39 +47,50 @@ func (h *WSMessageHandler) Handle(
 	client *ws.Client,
 	data []byte,
 ) {
-	var req ws.IncomingMessage
+	var message ws.IncomingMessage
 
-	if err := json.Unmarshal(data, &req); err != nil {
+	if err := json.Unmarshal(data, &message); err != nil {
 		h.sendError(client, "invalid message format")
 		return
 	}
 
-	switch req.Type {
+	switch message.Type {
 	case "join_channel":
-		h.handleJoinChannel(client, req)
+		h.handleJoinChannel(client, message)
 
 	case "send_message":
-		h.handleSendMessage(client, req)
+		h.handleSendMessage(client, message)
 
 	case "leave_channel":
-		h.handleLeaveChannel(client, req)
+		h.handleLeaveChannel(client, message)
 
 	case "join_conversation":
 		h.handleJoinConversation(
 			client,
-			req,
+			message,
 		)
 
 	case "send_conversation_message":
 		h.handleSendConversationMessage(
 			client,
-			req,
+			message,
 		)
 
 	case "leave_conversation":
 		h.handleLeaveConversation(
 			client,
-			req,
+			message,
+		)
+
+	case ws.MessageTypeMarkDelivered:
+		h.handleMarkDelivered(
+			client,
+			message,
+		)
+	case ws.MessageTypeMarkRead:
+		h.handleMarkRead(
+			client,
+			message,
 		)
 
 	default:
@@ -407,6 +422,148 @@ func (h *WSMessageHandler) handleLeaveConversation(
 			Message: "left conversation successfully",
 		},
 	)
+}
+
+func (h *WSMessageHandler) handleMarkDelivered(
+	client *ws.Client,
+	message ws.IncomingMessage,
+) {
+	result, err := h.directReceiptService.MarkDelivered(
+		client.UserID,
+		message.ConversationID,
+		message.MessageID,
+	)
+
+	if err != nil {
+		h.sendError(
+			client,
+			err.Error(),
+		)
+		return
+	}
+
+	h.sendReceiptAck(
+		client,
+		ws.MessageTypeDelivered,
+		result,
+	)
+
+	h.publishDirectReceipt(
+		ws.MessageTypeDelivered,
+		result,
+	)
+
+}
+
+func (h *WSMessageHandler) handleMarkRead(
+	client *ws.Client,
+	message ws.IncomingMessage,
+) {
+	result, err := h.directReceiptService.MarkRead(
+		client.UserID,
+		message.ConversationID,
+		message.MessageID,
+	)
+
+	if err != nil {
+		h.sendError(
+			client,
+			err.Error(),
+		)
+		return
+	}
+
+	h.sendReceiptAck(
+		client,
+		ws.MessageTypeMarkRead,
+		result,
+	)
+
+	h.publishDirectReceipt(
+		ws.MessageTypeRead,
+		result,
+	)
+
+}
+
+func (h *WSMessageHandler) sendReceiptAck(
+	client *ws.Client,
+	receipType string,
+	result *service.DirectReceiptResult,
+) {
+	ack := ws.ReceipAck{
+		Type: ws.MessageTypeReceiptAck,
+
+		ReceipType: receipType,
+
+		ConversationID: result.ConversationID,
+
+		MessageID: result.MessageID,
+	}
+
+	payload, err := json.Marshal(ack)
+
+	if err != nil {
+		return
+
+	}
+
+	client.SendMessage(
+		payload,
+	)
+}
+
+func (h *WSMessageHandler) publishDirectReceipt(
+	eventType string,
+	result *service.DirectReceiptResult,
+) {
+	event := ws.ReceiptEvent{
+		Type: eventType,
+
+		ConversationID: result.ConversationID,
+
+		MessageID: result.MessageID,
+
+		UserID: result.UserID,
+
+		At: result.At.Format(
+			time.RFC3339Nano,
+		),
+	}
+
+	payload, err := json.Marshal(
+		event,
+	)
+	if err != nil {
+		log.Printf(
+			"marshal receipt event failed: %v",
+			err,
+		)
+		return
+	}
+
+	ctx, cancel :=
+		context.WithTimeout(
+			context.Background(),
+			time.Second,
+		)
+
+	defer cancel()
+
+	if err := h.broker.PublishConversation(
+		ctx,
+		result.ConversationID,
+		payload,
+	); err != nil {
+		log.Printf(
+			"publish receipt failed: conversation_id=%d message_id=%d err=%v",
+			result.ConversationID,
+			result.MessageID,
+		)
+
+		return
+	}
+
 }
 
 func (h *WSMessageHandler) send(

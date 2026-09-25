@@ -50,6 +50,10 @@ type ConversationRepository interface {
 		bool,
 		error,
 	)
+
+	ListMember(
+		conversationID uint,
+	) ([]model.ConversationMember, error)
 }
 
 type FriendshipChecker interface {
@@ -571,4 +575,44 @@ func decodeConversationCursor(
 	}
 
 	return cursor, nil
+}
+
+func (s *ConversationService) GetDirectPeeID(
+	userID uint,
+	conversationID uint,
+) (uint, error) {
+	conversation, err := s.GetAccessibleConversation(userID, conversationID)
+
+	if err != nil {
+		return 0, err
+	}
+
+	if conversation.Type != model.ConversationTypeDirect {
+		return 0, ErrInvalidConversationType
+	}
+
+	members, err := s.conversationRepo.ListMember(conversationID)
+
+	if err != nil {
+		return 0, err
+	}
+
+	var peerID uint
+
+	for _, member := range members {
+		if member.UserID == userID {
+			continue
+		}
+		if peerID != 0 {
+			return 0, ErrInvalidConversationType
+		}
+		peerID = member.UserID
+	}
+
+	if peerID == 0 {
+		return 0, ErrInvalidConversationType
+	}
+
+	return peerID, nil
+
 }
