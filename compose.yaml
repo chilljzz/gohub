@@ -1,0 +1,212 @@
+name: gohub
+
+services:
+  mysql:
+    image: mysql:8.4
+
+    restart: unless-stopped
+
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${GOHUB_MYSQL_DATABASE}
+      MYSQL_USER: ${GOHUB_MYSQL_USERNAME}
+      MYSQL_PASSWORD: ${GOHUB_MYSQL_PASSWORD}
+
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+
+  redis:
+    image: redis:7.4-alpine
+
+    restart: unless-stopped
+
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+
+    volumes:
+      - redis_data:/data
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "ping"
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+
+  kafka-data-init:
+    image: alpine:3.24
+
+    user: "0:0"
+
+    volumes:
+      - kafka_data:/data
+
+    command:
+      - sh
+      - -c
+      - |
+        chown -R 1000:1000 /data
+
+
+
+  kafka:
+    image: apache/kafka:4.3.1
+
+
+    restart: unless-stopped
+
+    environment:
+      KAFKA_NODE_ID: 1
+
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: >
+        CONTROLLER:PLAINTEXT,
+        PLAINTEXT:PLAINTEXT
+
+      KAFKA_CONTROLLER_QUORUM_VOTERS: >
+        1@kafka:9093
+
+      KAFKA_LISTENERS: >
+        PLAINTEXT://:9092,
+        CONTROLLER://:9093
+
+      KAFKA_ADVERTISED_LISTENERS: >
+        PLAINTEXT://kafka:9092
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+
+    volumes:
+      - kafka_data:/tmp/kraft-combined-logs
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+
+
+  kafka-init:
+    image: apache/kafka:4.3.1
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+    environment:
+      KAFKA_TOPIC: ${GOHUB_KAFKA_MESSAGE_CREATED_TOPIC}
+
+    entrypoint:
+      - /bin/bash
+      - -c
+
+    command:
+      - |
+        /opt/kafka/bin/kafka-topics.sh \
+          --bootstrap-server kafka:9092 \
+          --create \
+          --if-not-exists \
+          --topic "$${KAFKA_TOPIC}" \
+          --partitions 3 \
+          --replication-factor 1
+
+
+  gohub:
+    image: gohub:day27.5
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GOPROXY: ${GOHUB_BUILD_GOPROXY}
+
+    restart: unless-stopped
+
+    environment:
+      GOHUB_SERVER_PORT: 8081
+      GOHUB_SERVER_MODE: release
+
+      GOHUB_MYSQL_HOST: mysql
+      GOHUB_MYSQL_PORT: 3306
+      GOHUB_MYSQL_USERNAME: ${GOHUB_MYSQL_USERNAME}
+      GOHUB_MYSQL_PASSWORD: ${GOHUB_MYSQL_PASSWORD}
+      GOHUB_MYSQL_DATABASE: ${GOHUB_MYSQL_DATABASE}
+      GOHUB_MYSQL_CHARSET: utf8mb4
+
+      GOHUB_REDIS_ADDR: redis:6379
+      GOHUB_REDIS_PASSWORD: ""
+      GOHUB_REDIS_DB: 0
+
+      GOHUB_JWT_SECRET: ${GOHUB_JWT_SECRET}
+      GOHUB_JWT_EXPIRE_HOURS: ${GOHUB_JWT_EXPIRE_HOURS}
+
+      GOHUB_KAFKA_BROKERS: kafka:9092
+
+      GOHUB_KAFKA_MESSAGE_CREATED_TOPIC: ${GOHUB_KAFKA_MESSAGE_CREATED_TOPIC}
+
+      GOHUB_KAFKA_CONSUMER_GROUP: ${GOHUB_KAFKA_CONSUMER_GROUP}
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+      kafka-init:
+        condition: service_completed_successfully
+
+    ports:
+      - "${GOHUB_HOST_PORT}:8081"
+
+
+volumes:
+  mysql_data:
+  redis_data:
+  kafka_data:
