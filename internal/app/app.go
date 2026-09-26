@@ -24,6 +24,11 @@ type App struct {
 }
 
 func New() (*App, error) {
+
+	gin.SetMode(
+		config.Conf.Server.Mode,
+	)
+
 	manager := ws.NewManager()
 
 	broker := realtime.NewRedisBroker(
