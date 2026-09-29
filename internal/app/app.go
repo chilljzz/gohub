@@ -232,11 +232,33 @@ func (a *App) Run() error {
 
 	log.Printf("http server stopped")
 
-	log.Printf("waiting for background workers")
+	a.manager.Shutdown()
 
-	wg.Wait()
+	workerDone := make(chan struct{})
 
-	log.Printf("background workers stopped")
+	go func() {
+		wg.Wait()
+		close(workerDone)
+	}()
+
+	workerWaitCtx, workWaitCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer workWaitCancel()
+
+	select {
+
+	case <-workerDone:
+
+		log.Printf(
+			"background workers stopped",
+		)
+
+	case <-workerWaitCtx.Done():
+
+		return fmt.Errorf(
+			"background workers shutdown timeout: %w",
+			workerWaitCtx.Err(),
+		)
+	}
 
 	return nil
 }
