@@ -77,7 +77,7 @@ func (c *Client) SendMessage(message []byte) bool {
 
 }
 
-func (c *Client) ReadLoop() {
+func (c *Client) ReadLoop(ctx context.Context) {
 	defer c.Close()
 	defer c.recoverLoop("read_loop")
 
@@ -96,7 +96,7 @@ func (c *Client) ReadLoop() {
 		func(string) error {
 
 			if c.presence != nil {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				ctx, cancel := context.WithTimeout(ctx, time.Second)
 				err := c.presence.Touch(ctx, c.UserID)
 				cancel()
 				if err != nil {
@@ -129,18 +129,21 @@ func (c *Client) ReadLoop() {
 			continue
 		}
 
-		c.handler.Handle(c, data)
+		c.handler.Handle(ctx, c, data)
 
 	}
 }
 
-func (c *Client) WriteLoop() {
+func (c *Client) WriteLoop(ctx context.Context) {
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
 	defer c.Close()
 	defer c.recoverLoop("write_loop")
 	for {
 		select {
+		case <-ctx.Done():
+			return
+
 		case message, ok := <-c.Send:
 			if !ok {
 				return

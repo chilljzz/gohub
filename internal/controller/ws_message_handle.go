@@ -44,6 +44,7 @@ func NewWSMessageHandler(
 }
 
 func (h *WSMessageHandler) Handle(
+	ctx context.Context,
 	client *ws.Client,
 	data []byte,
 ) {
@@ -59,7 +60,7 @@ func (h *WSMessageHandler) Handle(
 		h.handleJoinChannel(client, message)
 
 	case "send_message":
-		h.handleSendMessage(client, message)
+		h.handleSendMessage(ctx, client, message)
 
 	case "leave_channel":
 		h.handleLeaveChannel(client, message)
@@ -72,6 +73,7 @@ func (h *WSMessageHandler) Handle(
 
 	case "send_conversation_message":
 		h.handleSendConversationMessage(
+			ctx,
 			client,
 			message,
 		)
@@ -84,11 +86,13 @@ func (h *WSMessageHandler) Handle(
 
 	case ws.MessageTypeMarkDelivered:
 		h.handleMarkDelivered(
+			ctx,
 			client,
 			message,
 		)
 	case ws.MessageTypeMarkRead:
 		h.handleMarkRead(
+			ctx,
 			client,
 			message,
 		)
@@ -144,6 +148,7 @@ func (h *WSMessageHandler) handleJoinChannel(
 }
 
 func (h *WSMessageHandler) handleSendMessage(
+	ctx context.Context,
 	client *ws.Client,
 	req ws.IncomingMessage,
 ) {
@@ -232,6 +237,7 @@ func (h *WSMessageHandler) handleSendMessage(
 	}
 
 	if err := h.publishConversationMessage(
+		ctx,
 		conversation.ID,
 		result,
 	); err != nil {
@@ -308,6 +314,7 @@ func (h *WSMessageHandler) handleJoinConversation(
 }
 
 func (h *WSMessageHandler) handleSendConversationMessage(
+	ctx context.Context,
 	client *ws.Client,
 	req ws.IncomingMessage,
 ) {
@@ -380,7 +387,7 @@ func (h *WSMessageHandler) handleSendConversationMessage(
 		return
 	}
 
-	if err := h.publishConversationMessage(message.ConversationID, payload); err != nil {
+	if err := h.publishConversationMessage(ctx, message.ConversationID, payload); err != nil {
 		log.Printf(
 			"publish conversation message failed: "+
 				"user_id=%d conversation_id=%d err=%v",
@@ -425,6 +432,7 @@ func (h *WSMessageHandler) handleLeaveConversation(
 }
 
 func (h *WSMessageHandler) handleMarkDelivered(
+	ctx context.Context,
 	client *ws.Client,
 	message ws.IncomingMessage,
 ) {
@@ -449,6 +457,7 @@ func (h *WSMessageHandler) handleMarkDelivered(
 	)
 
 	h.publishDirectReceipt(
+		ctx,
 		ws.MessageTypeDelivered,
 		result,
 	)
@@ -456,6 +465,7 @@ func (h *WSMessageHandler) handleMarkDelivered(
 }
 
 func (h *WSMessageHandler) handleMarkRead(
+	ctx context.Context,
 	client *ws.Client,
 	message ws.IncomingMessage,
 ) {
@@ -480,6 +490,7 @@ func (h *WSMessageHandler) handleMarkRead(
 	)
 
 	h.publishDirectReceipt(
+		ctx,
 		ws.MessageTypeRead,
 		result,
 	)
@@ -514,6 +525,7 @@ func (h *WSMessageHandler) sendReceiptAck(
 }
 
 func (h *WSMessageHandler) publishDirectReceipt(
+	ctx context.Context,
 	eventType string,
 	result *service.DirectReceiptResult,
 ) {
@@ -541,14 +553,6 @@ func (h *WSMessageHandler) publishDirectReceipt(
 		)
 		return
 	}
-
-	ctx, cancel :=
-		context.WithTimeout(
-			context.Background(),
-			time.Second,
-		)
-
-	defer cancel()
 
 	if err := h.broker.PublishConversation(
 		ctx,
@@ -594,14 +598,10 @@ func (h *WSMessageHandler) sendError(
 }
 
 func (h *WSMessageHandler) publishConversationMessage(
+	ctx context.Context,
 	conversationID uint,
 	payload []byte,
 ) error {
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		2*time.Second,
-	)
-	defer cancel()
 
 	return h.broker.PublishConversation(
 		ctx,

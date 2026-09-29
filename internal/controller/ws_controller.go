@@ -39,6 +39,13 @@ func NewWSController(
 }
 
 func (c *WSController) Connect(ctx *gin.Context) {
+
+	connCtx, cancel :=
+		context.WithCancel(
+			ctx.Request.Context(),
+		)
+	defer cancel()
+
 	userID, ok := getCurrentUserID(ctx)
 	if !ok {
 		response.Fail(
@@ -68,14 +75,14 @@ func (c *WSController) Connect(ctx *gin.Context) {
 	)
 	c.manager.Register(client)
 
-	touchCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	touchCtx, cancel := context.WithTimeout(connCtx, time.Second)
 	if err := c.presence.Touch(touchCtx, userID); err != nil {
 		log.Printf("initial presence touch failed: user_id=%d err=%v", userID, err)
 	}
 	cancel()
 
-	go client.WriteLoop()
+	go client.WriteLoop(connCtx)
 
-	client.ReadLoop()
+	client.ReadLoop(connCtx)
 
 }

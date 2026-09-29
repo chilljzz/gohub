@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/chilljzz/gohub/internal/app"
 	"github.com/chilljzz/gohub/internal/database"
@@ -24,13 +27,19 @@ func main() {
 		log.Fatalf("init redis failed: %v", err)
 	}
 
-	application, err := app.New()
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+	defer stop()
+
+	application, err := app.New(ctx)
 	if err != nil {
 		log.Fatalf("init app failed: %v", err)
 	}
 
-	ctx := context.Background()
-	if err := application.Run(ctx); err != nil {
+	if err := application.Run(); err != nil {
 		log.Fatalf("server run failed: %v", err)
 	}
 

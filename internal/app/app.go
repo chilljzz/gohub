@@ -2,9 +2,13 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"runtime/debug"
+	"sync"
+	"time"
 
 	"github.com/chilljzz/gohub/internal/database"
 	"github.com/chilljzz/gohub/internal/messaging"
@@ -21,9 +25,10 @@ type App struct {
 	broker         *realtime.RedisBroker
 	kafkaPublisher *messaging.KafkaMessagePublisher
 	kafkaConsumer  *messaging.MessageCreatedConsumer
+	ctx            context.Context
 }
 
-func New() (*App, error) {
+func New(ctx context.Context) (*App, error) {
 
 	gin.SetMode(
 		config.Conf.Server.Mode,
@@ -39,7 +44,7 @@ func New() (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("init kafka publisher:%w", err)
 	}
-	kafkaConsumer, err := messaging.NewMessageCreatedConsumer(config.Conf.Kafka)
+	kafkaConsumer, err := messaging.NewMessageCreatedConsumer(config.Conf.Kafka, ctx)
 
 	if err != nil {
 		kafkaPublisher.Close()
@@ -57,13 +62,23 @@ func New() (*App, error) {
 		broker:         broker,
 		kafkaPublisher: kafkaPublisher,
 		kafkaConsumer:  kafkaConsumer,
+		ctx:            ctx,
 	}, nil
 }
 
 func (a *App) startRedisSubscriber(
 	ctx context.Context,
+	wg *sync.WaitGroup,
 ) {
+
+	wg.Add(1)
+
 	go func() {
+		log.Printf("redis subscriber started")
+		defer func() {
+			log.Printf("redis subscriber exited")
+			wg.Done()
+		}()
 		defer func() {
 			if err := recover(); err != nil {
 				log.Printf(
@@ -74,10 +89,13 @@ func (a *App) startRedisSubscriber(
 			}
 
 		}()
+
 		err := a.broker.SubscribeConversations(
 			ctx,
 			func(topic string, payload []byte) {
+
 				conversationID, err := realtime.ParseConversationTopic(topic)
+
 				if err != nil {
 					log.Printf(
 						"invalid redis conversation=%s err=%v",
@@ -99,7 +117,7 @@ func (a *App) startRedisSubscriber(
 				)
 			},
 		)
-		if err != nil {
+		if err != nil && ctx.Err() == nil {
 			log.Printf(
 				"redis subscriber stopped: %v",
 				err,
@@ -112,18 +130,38 @@ func (
 	a *App,
 ) startKafkaConsumer(
 	ctx context.Context,
+	wg *sync.WaitGroup,
 ) {
-	go a.kafkaConsumer.Run(
-		ctx,
-	)
+	wg.Add(1)
+	go func() {
+		log.Printf("kafka consumer started")
+
+		defer func() {
+			log.Printf("kafka consumer exited")
+			wg.Done()
+		}()
+
+		err := a.kafkaConsumer.Run(ctx)
+
+		if err != nil && ctx.Err() == nil {
+			log.Printf(
+				"kafka consumer error: %v",
+				err,
+			)
+		}
+	}()
 }
 
-func (a *App) Run(
-	ctx context.Context,
-) error {
-	a.startRedisSubscriber(ctx)
+func (a *App) Run() error {
 
-	a.startKafkaConsumer(ctx)
+	var wg sync.WaitGroup
+
+	runCtx, cancel := context.WithCancel(a.ctx)
+	defer cancel()
+
+	a.startRedisSubscriber(runCtx, &wg)
+
+	a.startKafkaConsumer(runCtx, &wg)
 
 	defer a.kafkaConsumer.Close()
 
@@ -134,9 +172,71 @@ func (a *App) Run(
 		config.Conf.Server.Port,
 	)
 
-	log.Printf(
-		"server starting: addr=%s",
-		addr,
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           a.router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	serverErrCh := make(chan error, 1)
+
+	go func() {
+		log.Printf(
+			"server starting: addr=%s",
+			addr,
+		)
+
+		err := server.ListenAndServe()
+
+		if err != nil &&
+			!errors.Is(err, http.ErrServerClosed) {
+			serverErrCh <- err
+			return
+		}
+
+		serverErrCh <- nil
+	}()
+
+	select {
+	case <-a.ctx.Done():
+		log.Printf("shutdown signal received")
+
+	case err := <-serverErrCh:
+		if err != nil {
+			return fmt.Errorf(
+				"http server failed: %w",
+				err,
+			)
+		}
+
+		return nil
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(
+		context.Background(),
+		10*time.Second,
 	)
-	return a.router.Run(addr)
+	defer cancel()
+
+	log.Printf("shutting down http server")
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf(
+			"http server shutdown failed: %w",
+			err,
+		)
+	}
+
+	log.Printf("http server stopped")
+
+	log.Printf("waiting for background workers")
+
+	wg.Wait()
+
+	log.Printf("background workers stopped")
+
+	return nil
 }

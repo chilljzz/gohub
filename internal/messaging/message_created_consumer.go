@@ -15,10 +15,12 @@ import (
 
 type MessageCreatedConsumer struct {
 	client *kgo.Client
+	ctx    context.Context
 }
 
 func NewMessageCreatedConsumer(
 	cfg config.KafkaConfig,
+	ctx context.Context,
 ) (*MessageCreatedConsumer, error) {
 
 	brokers := cfg.Brokers
@@ -45,10 +47,10 @@ func NewMessageCreatedConsumer(
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	processCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	if err := client.Ping(ctx); err != nil {
+	if err := client.Ping(processCtx); err != nil {
 		client.Close()
 		return nil, fmt.Errorf("ping kafka consumer: %w", err)
 	}
@@ -59,12 +61,19 @@ func NewMessageCreatedConsumer(
 
 }
 
-func (c *MessageCreatedConsumer) Run(ctx context.Context) {
+func (c *MessageCreatedConsumer) Run(
+	ctx context.Context,
+) error {
+
 	for {
 		fetches := c.client.PollFetches(ctx)
 
 		if ctx.Err() != nil {
-			return
+			return nil
+		}
+
+		if fetches.IsClientClosed() {
+			return nil
 		}
 
 		for _, fetchErr := range fetches.Errors() {
