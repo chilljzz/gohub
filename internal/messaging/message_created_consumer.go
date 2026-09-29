@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/chilljzz/gohub/internal/event"
@@ -77,11 +77,11 @@ func (c *MessageCreatedConsumer) Run(
 		}
 
 		for _, fetchErr := range fetches.Errors() {
-			log.Printf(
-				"kafka consume error: topic=%s partition=%d err=%s",
-				fetchErr.Topic,
-				fetchErr.Partition,
-				fetchErr.Err,
+			slog.Error(
+				"kafka consume faild",
+				slog.String("topic", fetchErr.Topic),
+				slog.Int("partition", int(fetchErr.Partition)),
+				slog.Any("error", fetchErr.Err),
 			)
 		}
 
@@ -93,23 +93,31 @@ func (c *MessageCreatedConsumer) Run(
 			var e event.MessageCreated
 
 			if err := json.Unmarshal(record.Value, &e); err != nil {
-				log.Printf(
-					"decode message.created failed: topic=%s partition=%d offset=%d err=%v",
-					record.Topic,
-					record.Partition,
-					record.Offset,
-					err,
+				slog.Error(
+					"decode message.created failed",
+
+					slog.String("topic", record.Topic),
+
+					slog.Int("partition", int(record.Partition)),
+
+					slog.Int64("offset", record.Offset),
+
+					slog.Any("error", err),
 				)
 				continue
 			}
 
-			log.Printf(
-				"kafka message.created consumed: event_id=%s message_id=%d conversation_id=%d partition=%d offset=%d",
-				e.EventID,
-				e.MessageID,
-				e.ConversationID,
-				record.Partition,
-				record.Offset,
+			slog.Debug(
+				"message.created consumed",
+				slog.String("event_id", e.EventID),
+
+				slog.Uint64("message_id", uint64(e.MessageID)),
+
+				slog.Uint64("conversation_id", uint64(e.ConversationID)),
+
+				slog.Int("partition", int(record.Partition)),
+
+				slog.Int64("offset", record.Offset),
 			)
 		}
 

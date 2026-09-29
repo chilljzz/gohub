@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/chilljzz/gohub/internal/app"
 	"github.com/chilljzz/gohub/internal/database"
+	"github.com/chilljzz/gohub/internal/logging"
 	"github.com/chilljzz/gohub/pkg/config"
 )
 
@@ -18,6 +20,10 @@ func main() {
 	}
 
 	c := config.Conf
+
+	logger := logging.New(c.Server.Mode)
+
+	slog.SetDefault(logger)
 
 	if err := database.InitMySQL(c.Mysql); err != nil {
 		log.Fatalf("init mysql failed: %v", err)

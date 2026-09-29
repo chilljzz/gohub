@@ -2,7 +2,7 @@ package ws
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -48,11 +48,13 @@ func (c *Client) Close() {
 		c.manager.Unregister(c)
 
 		if err := c.Conn.Close(); err != nil {
-			log.Printf(
-				"user %d close websocket error:%v\n",
-				c.UserID,
-				err,
+
+			slog.Error(
+				"user  close websocket error",
+				slog.Uint64("user_id", uint64(c.UserID)),
+				slog.Any("error", err),
 			)
+
 		}
 
 	})
@@ -84,11 +86,13 @@ func (c *Client) ReadLoop(ctx context.Context) {
 	c.Conn.SetReadLimit(maxMessageSize)
 
 	if err := c.Conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
-		log.Printf(
-			"user %d set read deadline error: %v\n",
-			c.UserID,
-			err,
+
+		slog.Error(
+			"user set read deadline error",
+			slog.Uint64("user_id", uint64(c.UserID)),
+			slog.Any("error", err),
 		)
+
 		return
 	}
 
@@ -100,13 +104,19 @@ func (c *Client) ReadLoop(ctx context.Context) {
 				err := c.presence.Touch(ctx, c.UserID)
 				cancel()
 				if err != nil {
-					log.Printf("presence touch failed: user_id=%d err=%v", c.UserID, err)
+					slog.Warn(
+						"presence touch failed",
+						slog.Uint64("user_id", uint64(c.UserID)),
+						slog.Any("error", err),
+					)
+
 				}
 			}
 
-			log.Printf(
-				"user %d pong received\n",
-				c.UserID,
+			slog.Debug(
+				"websocket pong sent",
+
+				slog.Uint64("user_id", uint64(c.UserID)),
 			)
 			return c.Conn.SetReadDeadline(
 				time.Now().Add(pongWait),
@@ -117,10 +127,10 @@ func (c *Client) ReadLoop(ctx context.Context) {
 	for {
 		messageType, data, err := c.Conn.ReadMessage()
 		if err != nil {
-			log.Printf(
-				"user %d read error: %v\n",
-				c.UserID,
-				err,
+			slog.Error(
+				"user read error",
+				slog.Uint64("user_id", uint64(c.UserID)),
+				slog.Any("error", err),
 			)
 			return
 		}
@@ -149,10 +159,10 @@ func (c *Client) WriteLoop(ctx context.Context) {
 				return
 			}
 			if err := c.Conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
-				log.Printf(
-					"user %d set write deadline error: %v\n",
-					c.UserID,
-					err,
+				slog.Error(
+					"user set write deadline error",
+					slog.Uint64("user_id", uint64(c.UserID)),
+					slog.Any("error", err),
 				)
 
 				return
@@ -161,10 +171,11 @@ func (c *Client) WriteLoop(ctx context.Context) {
 				websocket.TextMessage,
 				message,
 			); err != nil {
-				log.Printf(
-					"user %d write error: %v\n",
-					c.UserID,
-					err,
+
+				slog.Error(
+					"user  write error",
+					slog.Uint64("user_id", uint64(c.UserID)),
+					slog.Any("error", err),
 				)
 
 				return
@@ -172,26 +183,28 @@ func (c *Client) WriteLoop(ctx context.Context) {
 		case <-ticker.C:
 
 			if err := c.Conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
-				log.Printf(
-					"user %d set ping deadline error: %v\n",
-					c.UserID,
-					err,
+
+				slog.Error(
+					"user set ping deadline error",
+					slog.Uint64("user_id", uint64(c.UserID)),
+					slog.Any("error", err),
 				)
 
 				return
 			}
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				log.Printf(
-					"user %d ping error: %v\n",
-					c.UserID,
-					err,
+				slog.Error(
+					"user ping error",
+					slog.Uint64("user_id", uint64(c.UserID)),
+					slog.Any("error", err),
 				)
 
 				return
 			}
-			log.Printf(
-				"user %d ping sent\n",
-				c.UserID,
+			slog.Debug(
+				"websocket ping sent",
+
+				slog.Uint64("user_id", uint64(c.UserID)),
 			)
 
 		case <-c.closed:
@@ -203,12 +216,16 @@ func (c *Client) WriteLoop(ctx context.Context) {
 
 func (c *Client) recoverLoop(name string) {
 	if err := recover(); err != nil {
-		log.Printf(
-			"websocket panic: loop = %s user_id=%d err=%v\n%s",
-			name,
-			c.UserID,
-			err,
-			debug.Stack(),
+		slog.Error(
+			"websocket panic",
+
+			slog.String("loop", name),
+
+			slog.Uint64("user_id", uint64(c.UserID)),
+
+			slog.Any("error", err),
+
+			slog.String("stack", string(debug.Stack())),
 		)
 	}
 }

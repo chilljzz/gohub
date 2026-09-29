@@ -11,18 +11,28 @@ type Manager struct {
 	clients map[uint]map[*Client]struct{}
 
 	rooms map[uint]map[*Client]struct{}
+
+	allClients map[*Client]struct{}
+
+	shuttingDown bool
 }
 
 func NewManager() *Manager {
 	return &Manager{
-		clients: make(map[uint]map[*Client]struct{}),
-		rooms:   make(map[uint]map[*Client]struct{}),
+		clients:    make(map[uint]map[*Client]struct{}),
+		rooms:      make(map[uint]map[*Client]struct{}),
+		allClients: make(map[*Client]struct{}),
 	}
 }
 
-func (m *Manager) Register(client *Client) {
+func (m *Manager) Register(client *Client) bool {
 
 	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.shuttingDown {
+		return false
+	}
 
 	userClients := m.clients[client.UserID]
 
@@ -31,16 +41,15 @@ func (m *Manager) Register(client *Client) {
 		m.clients[client.UserID] = userClients
 	}
 	userClients[client] = struct{}{}
-	userCount := len(m.clients)
-	connectionCount := m.connectionCountLocked()
-	m.mu.Unlock()
+
+	m.allClients[client] = struct{}{}
 
 	log.Printf(
-		"user %d connection registered, users=%d connections=%d",
+		"user %d connection registered",
 		client.UserID,
-		userCount,
-		connectionCount,
 	)
+
+	return true
 
 }
 
@@ -59,34 +68,35 @@ func (m *Manager) Unregister(client *Client) {
 			delete(m.clients, client.UserID)
 		}
 	}
+
+	delete(
+		m.allClients,
+		client,
+	)
+
 	m.removeFromRoomsLocked(client)
-
-	userCount := len(m.clients)
-
-	connectionCount := m.connectionCountLocked()
 
 	m.mu.Unlock()
 
 	if removed {
 		log.Printf(
-			"user %d connection unregistered, users=%d connections=%d",
+			"user %d connection unregistered",
 			client.UserID,
-			userCount,
-			connectionCount,
 		)
 	}
 
 }
-func (m *Manager) connectionCountLocked() int {
-	count := 0
 
-	for _, userClients := range m.clients {
+// func (m *Manager) connectionCountLocked() int {
+// 	count := 0
 
-		count += len(userClients)
-	}
+// 	for _, userClients := range m.clients {
 
-	return count
-}
+// 		count += len(userClients)
+// 	}
+
+// 	return count
+// }
 
 func (m *Manager) GetClients(userID uint) []*Client {
 	m.mu.RLock()
@@ -241,4 +251,58 @@ func (m *Manager) RoomUserIDs(
 		userIDs = append(userIDs, userID)
 	}
 	return userIDs
+}
+
+func (m *Manager) Shutdown() {
+	m.mu.RLock()
+
+	m.shuttingDown = true
+
+	clients := make(
+		[]*Client,
+		0,
+		len(m.allClients),
+	)
+
+	for client := range m.allClients {
+
+		clients =
+			append(
+				clients,
+				client,
+			)
+	}
+
+	m.mu.RUnlock()
+
+	const workerCount = 64
+
+	jobs := make(chan *Client)
+
+	var wg sync.WaitGroup
+
+	workers := workerCount
+
+	if len(clients) < workers {
+		workers = len(clients)
+	}
+
+	wg.Add(workers)
+
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			for Client := range jobs {
+				Client.Close()
+			}
+		}()
+	}
+
+	for _, client := range clients {
+		jobs <- client
+	}
+
+	close(jobs)
+	wg.Wait()
+
 }
