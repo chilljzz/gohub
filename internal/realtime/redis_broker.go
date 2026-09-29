@@ -108,8 +108,21 @@ func (b *RedisBroker) SubscribeConversations(
 
 	messages := pubsub.Channel()
 
-	for msg := range messages {
-		handler(msg.Channel, []byte(msg.Payload))
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+
+		case msg, ok := <-messages:
+			if !ok {
+				return nil
+			}
+
+			handler(
+				msg.Channel,
+				[]byte(msg.Payload),
+			)
+		}
 	}
-	return nil
+
 }

@@ -1,5 +1,7 @@
 package ws
 
+import "context"
+
 const (
 	MessageTypeMarkDelivered = "mark_delivered"
 	MessageTypeMarkRead      = "mark_read"
@@ -32,7 +34,7 @@ type OutgoingMessage struct {
 }
 
 type MessageHandler interface {
-	Handle(client *Client, data []byte)
+	Handle(ctx context.Context, client *Client, data []byte)
 }
 
 type MessageAck struct {
