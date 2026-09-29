@@ -133,6 +133,12 @@ func (h *WSMessageHandler) handleJoinChannel(
 		conversation.ID,
 	)
 
+	// slog.Info(
+	// 	"join conversation sussess",
+	// 	slog.Uint64("conversation", uint64(conversation.ID)),
+	// 	slog.Any("users", userIDs),
+	// )
+
 	log.Printf(
 		"conversation room: conversation_id=%d users=%v",
 		conversation.ID,

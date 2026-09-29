@@ -20,8 +20,13 @@ func InitRouter(
 	messageEventPublisher service.MessageEventPublisher,
 ) *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Logger())
+
+	r.Use(middleware.RequestID())
+
+	r.Use(middleware.AccessLogger())
+
 	r.Use(middleware.ErrorMiddleware())
+
 	r.GET("/ping", func(ctx *gin.Context) {
 		response.Success(ctx, gin.H{
 			"msg": "pong",

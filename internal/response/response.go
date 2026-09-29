@@ -67,9 +67,57 @@ func SuccessWithMsg(ctx *gin.Context, msg string, data interface{}) {
 }
 
 func Fail(ctx *gin.Context, code int, msg string) {
-	ctx.JSON(http.StatusOK, Response{
+	ctx.JSON(httpStatusForCode(code), Response{
 		Code: code,
 		Msg:  msg,
 		Data: nil,
 	})
+}
+
+func httpStatusForCode(
+	code int,
+) int {
+
+	switch code {
+
+	case CodeUnauthorized,
+		CodeUsernameOrPassword:
+
+		return http.StatusUnauthorized
+
+	case CodeForbidden,
+		CodeNotTeamMember,
+		CodeNotTeamOwner,
+		CodeNotConversationMember,
+		CodeDirectChatRequiresFriend:
+
+		return http.StatusForbidden
+
+	case CodeUserNotFound,
+		CodeFriendRequestNotFound,
+		CodeTeamNotFound,
+		CodeChannelNotFound,
+		CodeMessageNotFound,
+		CodeConversationNotFound:
+
+		return http.StatusNotFound
+
+	case CodeUserExists,
+		CodeAlreadyFriends,
+		CodeFriendRequestExists,
+		CodeFriendRequestProcessed,
+		CodeAlreadyTeamMember,
+		CodeChannelExists,
+		CodeConversationConflict:
+
+		return http.StatusConflict
+
+	case CodeServerError:
+
+		return http.StatusInternalServerError
+
+	default:
+
+		return http.StatusBadRequest
+	}
 }

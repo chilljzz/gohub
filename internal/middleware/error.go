@@ -2,8 +2,10 @@ package middleware
 
 import (
 	"log"
+	"log/slog"
 	"runtime/debug"
 
+	"github.com/chilljzz/gohub/internal/logging"
 	"github.com/chilljzz/gohub/internal/response"
 	"github.com/gin-gonic/gin"
 )
@@ -58,11 +60,36 @@ func ErrorMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		log.Printf(
-			"http request error: method=%s path=%s err=%v",
-			ctx.Request.Method,
-			ctx.Request.URL.Path,
-			err,
+		logger :=
+			logging.FromContext(
+				ctx.Request.Context(),
+			)
+
+		logger.ErrorContext(
+			ctx.Request.Context(),
+			"http panic",
+
+			slog.String(
+				"method",
+				ctx.Request.Method,
+			),
+
+			slog.String(
+				"path",
+				ctx.Request.URL.Path,
+			),
+
+			slog.Any(
+				"error",
+				err,
+			),
+
+			slog.String(
+				"stack",
+				string(
+					debug.Stack(),
+				),
+			),
 		)
 
 		response.Fail(

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"runtime/debug"
 	"sync"
@@ -74,17 +75,17 @@ func (a *App) startRedisSubscriber(
 	wg.Add(1)
 
 	go func() {
-		log.Printf("redis subscriber started")
+		slog.Info("redis subscriber started")
 		defer func() {
-			log.Printf("redis subscriber exited")
+			slog.Info("redis subscriber stopped")
 			wg.Done()
 		}()
 		defer func() {
 			if err := recover(); err != nil {
-				log.Printf(
-					"redis subscriber panic: %v\n%s",
-					err,
-					debug.Stack(),
+				slog.Error(
+					"redis subscriber panic",
+					slog.Any("error", err),
+					slog.String("stack", string(debug.Stack())),
 				)
 			}
 
@@ -97,6 +98,7 @@ func (a *App) startRedisSubscriber(
 				conversationID, err := realtime.ParseConversationTopic(topic)
 
 				if err != nil {
+
 					log.Printf(
 						"invalid redis conversation=%s err=%v",
 						topic,
@@ -134,19 +136,23 @@ func (
 ) {
 	wg.Add(1)
 	go func() {
-		log.Printf("kafka consumer started")
+		slog.Info("kafka consumer started")
 
 		defer func() {
-			log.Printf("kafka consumer exited")
+			slog.Info("kafka consumer exited")
 			wg.Done()
 		}()
 
 		err := a.kafkaConsumer.Run(ctx)
 
 		if err != nil && ctx.Err() == nil {
-			log.Printf(
-				"kafka consumer error: %v",
-				err,
+			slog.Error(
+				"kafka consumer stopped unexpectedly",
+
+				slog.Any(
+					"error",
+					err,
+				),
 			)
 		}
 	}()
@@ -184,9 +190,13 @@ func (a *App) Run() error {
 	serverErrCh := make(chan error, 1)
 
 	go func() {
-		log.Printf(
-			"server starting: addr=%s",
-			addr,
+		slog.Info(
+			"http server starting",
+
+			slog.String(
+				"addr",
+				addr,
+			),
 		)
 
 		err := server.ListenAndServe()
@@ -221,7 +231,7 @@ func (a *App) Run() error {
 	)
 	defer cancel()
 
-	log.Printf("shutting down http server")
+	slog.Info("shutting down http server")
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf(
@@ -230,7 +240,7 @@ func (a *App) Run() error {
 		)
 	}
 
-	log.Printf("http server stopped")
+	slog.Info("http server stopped")
 
 	a.manager.Shutdown()
 

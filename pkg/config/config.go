@@ -91,6 +91,9 @@ func InitConfig() error {
 		"kafka.brokers":               "GOHUB_KAFKA_BROKERS",
 		"kafka.message_created_topic": "GOHUB_KAFKA_MESSAGE_CREATED_TOPIC",
 		"kafka.consumer_group":        "GOHUB_KAFKA_CONSUMER_GROUP",
+
+		"LOG_LEVEL":  "",
+		"LOG_FORMAT": "",
 	}
 
 	for key, env := range bindings {
