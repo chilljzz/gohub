@@ -1,7 +1,7 @@
 package ws
 
 import (
-	"log"
+	"log/slog"
 	"sync"
 )
 
@@ -44,9 +44,9 @@ func (m *Manager) Register(client *Client) bool {
 
 	m.allClients[client] = struct{}{}
 
-	log.Printf(
-		"user %d connection registered",
-		client.UserID,
+	slog.Info(
+		"user connection registered",
+		slog.Uint64("user", uint64(client.UserID)),
 	)
 
 	return true
@@ -79,9 +79,9 @@ func (m *Manager) Unregister(client *Client) {
 	m.mu.Unlock()
 
 	if removed {
-		log.Printf(
-			"user %d connection unregistered",
-			client.UserID,
+		slog.Info(
+			"user connection unregistered",
+			slog.Uint64("user", uint64(client.UserID)),
 		)
 	}
 

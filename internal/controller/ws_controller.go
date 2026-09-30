@@ -73,7 +73,10 @@ func (c *WSController) Connect(ctx *gin.Context) {
 		c.handler,
 		c.presence,
 	)
-	c.manager.Register(client)
+	if ok := c.manager.Register(client); !ok {
+		client.Close()
+		return
+	}
 
 	touchCtx, cancel := context.WithTimeout(connCtx, time.Second)
 	if err := c.presence.Touch(touchCtx, userID); err != nil {
