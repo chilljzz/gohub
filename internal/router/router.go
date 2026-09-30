@@ -1,6 +1,7 @@
 package router
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/chilljzz/gohub/internal/controller"
@@ -18,12 +19,18 @@ func InitRouter(
 	broker *realtime.RedisBroker,
 	wsManager *ws.Manager,
 	messageEventPublisher service.MessageEventPublisher,
-) *gin.Engine {
+) (*gin.Engine, error) {
 	r := gin.New()
+
+	if err := r.SetTrustedProxies(nil); err != nil {
+		return nil, fmt.Errorf("ser trusted proxies: %w", err)
+	}
 
 	r.Use(middleware.RequestID())
 
 	r.Use(middleware.AccessLogger())
+
+	r.Use(middleware.SecurityHeaders())
 
 	r.Use(middleware.ErrorMiddleware())
 
@@ -158,17 +165,43 @@ func InitRouter(
 		directReceiptService,
 	)
 
+	loginLimiter := middleware.NewRateLimiter(
+		database.RedisClient,
+		"gohub:ratelimit:login",
+		10,
+		time.Minute,
+	)
+	registerLimiter := middleware.NewRateLimiter(
+		database.RedisClient,
+		"gohub:ratelimit:register",
+		5,
+		time.Minute,
+	)
+
+	apiLimiter := middleware.NewRateLimiter(
+		database.RedisClient,
+		"gohub:ratelimit:api",
+		300,
+		time.Minute,
+	)
+	// wsLimiter := middleware.NewRateLimiter(
+	// 	database.RedisClient,
+	// 	"gohub:ratelimit:ws",
+	// 	20,
+	// 	time.Minute,
+	// )
+
 	api := r.Group("/api")
 
 	user := api.Group("/users")
 	{
-		user.POST("/register", userController.Register)
-		user.POST("/login", userController.Login)
+		user.POST("/register", registerLimiter.ByIP(), userController.Register)
+		user.POST("/login", loginLimiter.ByIP(), userController.Login)
 
 	}
 
 	auth := api.Group("")
-	auth.Use(middleware.AuthMiddleware())
+	auth.Use(middleware.AuthMiddleware(), apiLimiter.ByUser())
 	{
 
 		auth.GET("/ws", wsController.Connect)
@@ -237,5 +270,5 @@ func InitRouter(
 		}
 	}
 
-	return r
+	return r, nil
 }

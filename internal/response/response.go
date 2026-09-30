@@ -31,6 +31,8 @@ const (
 	CodeFriendRequestNotFound  = 4103
 	CodeFriendRequestProcessed = 4104
 
+	CodeTooManyRequests = 4290
+
 	CodeTeamNotFound      = 6001
 	CodeNotTeamMember     = 6002
 	CodeNotTeamOwner      = 6003
@@ -115,6 +117,10 @@ func httpStatusForCode(
 	case CodeServerError:
 
 		return http.StatusInternalServerError
+
+	case CodeTooManyRequests:
+
+		return http.StatusTooManyRequests
 
 	default:
 

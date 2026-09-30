@@ -51,11 +51,17 @@ func New(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("init kafka consumer: %w", err)
 	}
 
-	r := router.InitRouter(
+	r, err := router.InitRouter(
 		broker,
 		manager,
 		kafkaPublisher,
 	)
+	if err != nil {
+		kafkaConsumer.Close()
+		kafkaPublisher.Close()
+		return nil, fmt.Errorf("init router: %w", err)
+	}
+
 	return &App{
 		router:         r,
 		manager:        manager,
