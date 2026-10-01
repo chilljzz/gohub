@@ -2,21 +2,45 @@ package controller
 
 import (
 	"context"
-	"log"
-	"net/http"
-	"time"
-
 	"github.com/chilljzz/gohub/internal/response"
 	"github.com/chilljzz/gohub/internal/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"log"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
 )
 
 var upgrade = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
+	CheckOrigin: func(
+		r *http.Request,
+	) bool {
+
+		origin := r.Header.Get(
+			"Origin",
+		)
+
+		if origin == "" {
+			// curl/Postman 等非浏览器客户端
+			return true
+		}
+
+		parsedOrigin, err := url.Parse(
+			origin,
+		)
+
+		if err != nil {
+			return false
+		}
+
+		return strings.EqualFold(
+			parsedOrigin.Host,
+			r.Host,
+		)
 	},
 }
 

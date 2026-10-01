@@ -184,12 +184,12 @@ func InitRouter(
 		300,
 		time.Minute,
 	)
-	// wsLimiter := middleware.NewRateLimiter(
-	// 	database.RedisClient,
-	// 	"gohub:ratelimit:ws",
-	// 	20,
-	// 	time.Minute,
-	// )
+	wsLimiter := middleware.NewRateLimiter(
+		database.RedisClient,
+		"gohub:ratelimit:ws",
+		20,
+		time.Minute,
+	)
 
 	api := r.Group("/api")
 
@@ -201,73 +201,80 @@ func InitRouter(
 	}
 
 	auth := api.Group("")
-	auth.Use(middleware.AuthMiddleware(), apiLimiter.ByUser())
+	auth.Use(middleware.AuthMiddleware())
 	{
 
-		auth.GET("/ws", wsController.Connect)
+		auth.GET("/ws", wsLimiter.ByUser(), wsController.Connect)
 
-		auth.GET("/users/me", userController.Me)
-		auth.PUT("/users/me", userController.UpdateMe)
-		friends := auth.Group("/friends")
+		rest := auth.Group("")
+		rest.Use(apiLimiter.ByUser())
 		{
-			friends.POST(
-				"/requests",
-				friendController.SendRequest,
-			)
-			friends.GET(
-				"/requests",
-				friendController.ListPendingRequests,
-			)
-			friends.POST(
-				"/requests/:id/accept",
-				friendController.AcceptRequest,
-			)
-			friends.GET(
-				"",
-				friendController.ListFriends,
-			)
-		}
 
-		teams := auth.Group("/teams")
-		{
-			teams.POST("", teamController.Create)
-			teams.GET("", teamController.ListMine)
-			teams.GET("/:id/members", teamController.ListMembers)
-			teams.POST("/:id/members", teamController.AddMember)
+			rest.GET("/users/me", userController.Me)
+			rest.PUT("/users/me", userController.UpdateMe)
 
-			channels := teams.Group("/:id/channels")
+			friends := rest.Group("/friends")
 			{
-				channels.POST("", channelController.Create)
-				channels.GET("", channelController.List)
+				friends.POST(
+					"/requests",
+					friendController.SendRequest,
+				)
+				friends.GET(
+					"/requests",
+					friendController.ListPendingRequests,
+				)
+				friends.POST(
+					"/requests/:id/accept",
+					friendController.AcceptRequest,
+				)
+				friends.GET(
+					"",
+					friendController.ListFriends,
+				)
+			}
+
+			teams := rest.Group("/teams")
+			{
+				teams.POST("", teamController.Create)
+				teams.GET("", teamController.ListMine)
+				teams.GET("/:id/members", teamController.ListMembers)
+				teams.POST("/:id/members", teamController.AddMember)
+
+				channels := teams.Group("/:id/channels")
+				{
+					channels.POST("", channelController.Create)
+					channels.GET("", channelController.List)
+				}
+			}
+			rest.GET("/channels/:id/messages", messageController.ListRecent)
+			rest.POST("/channels/:id/read", readController.MarkRead)
+			rest.GET("/channels/:id/unread-count", readController.UnreadCount)
+			rest.GET("/channels/:id/messages/sync", messageController.Sync)
+
+			conversationGroup := rest.Group("/conversations")
+			{
+				conversationGroup.POST("/direct", conversationController.CreateDirect)
+
+				conversationGroup.GET(
+					"/:id/messages",
+					conversationMessageController.ListRecent,
+				)
+
+				conversationGroup.GET(
+					"/:id/messages/sync",
+					conversationMessageController.Sync,
+				)
+				conversationGroup.GET(
+					"",
+					conversationController.List,
+				)
+				conversationGroup.GET(
+					"/:id/receipt-state",
+					directReceiptController.ReceiptState,
+				)
 			}
 		}
-		auth.GET("/channels/:id/messages", messageController.ListRecent)
-		auth.POST("/channels/:id/read", readController.MarkRead)
-		auth.GET("/channels/:id/unread-count", readController.UnreadCount)
-		auth.GET("/channels/:id/messages/sync", messageController.Sync)
 
-		conversationGroup := auth.Group("/conversations")
-		{
-			conversationGroup.POST("/direct", conversationController.CreateDirect)
-
-			conversationGroup.GET(
-				"/:id/messages",
-				conversationMessageController.ListRecent,
-			)
-
-			conversationGroup.GET(
-				"/:id/messages/sync",
-				conversationMessageController.Sync,
-			)
-			conversationGroup.GET(
-				"",
-				conversationController.List,
-			)
-			conversationGroup.GET(
-				"/:id/receipt-state",
-				directReceiptController.ReceiptState,
-			)
-		}
 	}
 
 	return r, nil

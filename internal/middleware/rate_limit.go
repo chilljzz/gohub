@@ -18,7 +18,7 @@ var fixedWindowScript = redis.NewScript(
 
 		if current == 1 
 			then 
-				redis.call("PEXPIRE",KEY[1],ARGV[1])
+				redis.call("PEXPIRE",KEYS[1],ARGV[1])
 			end
 
 		return current
@@ -96,6 +96,7 @@ func (l *RateLimiter) ByIP() gin.HandlerFunc {
 			ctx.Abort()
 			return
 		}
+		ctx.Next()
 	}
 }
 
@@ -122,6 +123,12 @@ func (l *RateLimiter) ByUser() gin.HandlerFunc {
 			value.(uint)
 
 		if !ok {
+			response.Fail(
+				ctx,
+				response.CodeUnauthorized,
+				"invalid user identity",
+			)
+			ctx.Abort()
 			return
 		}
 
@@ -140,18 +147,16 @@ func (l *RateLimiter) ByUser() gin.HandlerFunc {
 
 		if err != nil {
 
-			slog.Error(
+			logger := logging.FromContext(
+				ctx.Request.Context(),
+			)
+
+			logger.LogAttrs(
+				ctx.Request.Context(),
+				slog.LevelError,
 				"rate limiter unavailable",
-
-				slog.String(
-					"scope",
-					"user",
-				),
-
-				slog.Any(
-					"error",
-					err,
-				),
+				slog.String("scope", "user"),
+				slog.Any("error", err),
 			)
 
 			ctx.Next()
