@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
@@ -52,11 +51,17 @@ func New(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("init kafka consumer: %w", err)
 	}
 
-	r := router.InitRouter(
+	r, err := router.InitRouter(
 		broker,
 		manager,
 		kafkaPublisher,
 	)
+	if err != nil {
+		kafkaConsumer.Close()
+		kafkaPublisher.Close()
+		return nil, fmt.Errorf("init router: %w", err)
+	}
+
 	return &App{
 		router:         r,
 		manager:        manager,
@@ -99,11 +104,12 @@ func (a *App) startRedisSubscriber(
 
 				if err != nil {
 
-					log.Printf(
-						"invalid redis conversation=%s err=%v",
-						topic,
-						err,
+					slog.Warn(
+						"invalid redis conversation topic",
+						slog.Any("conversation", topic),
+						slog.Any("error", err),
 					)
+
 					return
 				}
 
@@ -112,17 +118,19 @@ func (a *App) startRedisSubscriber(
 					payload,
 				)
 
-				log.Printf(
-					"redis broadcast: conversation_id=%d clients=%d",
-					conversationID,
-					count,
+				slog.Debug(
+					"redis conversation broadcast",
+					slog.Uint64("conversation_id", uint64(conversationID)),
+					slog.Int("count", count),
 				)
+
 			},
 		)
 		if err != nil && ctx.Err() == nil {
-			log.Printf(
-				"redis subscriber stopped: %v",
-				err,
+			slog.Error(
+				"redis subscriber stopped unexpectedly",
+
+				slog.Any("error", err),
 			)
 		}
 	}()
@@ -212,7 +220,9 @@ func (a *App) Run() error {
 
 	select {
 	case <-a.ctx.Done():
-		log.Printf("shutdown signal received")
+		slog.Info(
+			"shutdown signal received",
+		)
 
 	case err := <-serverErrCh:
 		if err != nil {
@@ -258,7 +268,7 @@ func (a *App) Run() error {
 
 	case <-workerDone:
 
-		log.Printf(
+		slog.Info(
 			"background workers stopped",
 		)
 

@@ -12,7 +12,7 @@ func RequestID() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		requestID := newRequestID()
 
-		ctx.Header("X-REquest-ID", requestID)
+		ctx.Header("X-Request-ID", requestID)
 
 		requestCtx := logging.WithRequestID(
 			ctx.Request.Context(),

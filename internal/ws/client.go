@@ -114,7 +114,7 @@ func (c *Client) ReadLoop(ctx context.Context) {
 			}
 
 			slog.Debug(
-				"websocket pong sent",
+				"websocket pong received",
 
 				slog.Uint64("user_id", uint64(c.UserID)),
 			)

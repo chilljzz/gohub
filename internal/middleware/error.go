@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"log"
 	"log/slog"
 	"runtime/debug"
 
@@ -14,13 +13,15 @@ func ErrorMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Printf(
-					"http panic:methon=%s path=%s err=%v\n%s",
-					ctx.Request.Method,
-					ctx.Request.URL.Path,
-					err,
-					debug.Stack(),
+
+				slog.Error(
+					"http panic",
+					slog.String("methon", ctx.Request.Method),
+					slog.String("path", ctx.Request.URL.Path),
+					slog.Any("error", err),
+					slog.String("stack", string(debug.Stack())),
 				)
+
 				if !ctx.Writer.Written() {
 					response.Fail(
 						ctx,
@@ -40,12 +41,13 @@ func ErrorMiddleware() gin.HandlerFunc {
 
 		err := ctx.Errors.Last().Err
 		if ctx.Writer.Written() {
-			log.Printf(
-				"error after response written: method=%s path=%s err=%v",
-				ctx.Request.Method,
-				ctx.Request.URL.Path,
-				err,
+			slog.Error(
+				"error after response written",
+				slog.String("methon", ctx.Request.Method),
+				slog.String("path", ctx.Request.URL.Path),
+				slog.Any("error", err),
 			)
+
 			return
 		}
 
@@ -82,13 +84,6 @@ func ErrorMiddleware() gin.HandlerFunc {
 			slog.Any(
 				"error",
 				err,
-			),
-
-			slog.String(
-				"stack",
-				string(
-					debug.Stack(),
-				),
 			),
 		)
 

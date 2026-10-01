@@ -78,7 +78,7 @@ func (c *MessageCreatedConsumer) Run(
 
 		for _, fetchErr := range fetches.Errors() {
 			slog.Error(
-				"kafka consume faild",
+				"kafka consume failed",
 				slog.String("topic", fetchErr.Topic),
 				slog.Int("partition", int(fetchErr.Partition)),
 				slog.Any("error", fetchErr.Err),

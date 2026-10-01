@@ -1,6 +1,7 @@
 package router
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/chilljzz/gohub/internal/controller"
@@ -18,12 +19,18 @@ func InitRouter(
 	broker *realtime.RedisBroker,
 	wsManager *ws.Manager,
 	messageEventPublisher service.MessageEventPublisher,
-) *gin.Engine {
+) (*gin.Engine, error) {
 	r := gin.New()
+
+	if err := r.SetTrustedProxies(nil); err != nil {
+		return nil, fmt.Errorf("ser trusted proxies: %w", err)
+	}
 
 	r.Use(middleware.RequestID())
 
 	r.Use(middleware.AccessLogger())
+
+	r.Use(middleware.SecurityHeaders())
 
 	r.Use(middleware.ErrorMiddleware())
 
@@ -158,12 +165,38 @@ func InitRouter(
 		directReceiptService,
 	)
 
+	loginLimiter := middleware.NewRateLimiter(
+		database.RedisClient,
+		"gohub:ratelimit:login",
+		10,
+		time.Minute,
+	)
+	registerLimiter := middleware.NewRateLimiter(
+		database.RedisClient,
+		"gohub:ratelimit:register",
+		5,
+		time.Minute,
+	)
+
+	apiLimiter := middleware.NewRateLimiter(
+		database.RedisClient,
+		"gohub:ratelimit:api",
+		300,
+		time.Minute,
+	)
+	wsLimiter := middleware.NewRateLimiter(
+		database.RedisClient,
+		"gohub:ratelimit:ws",
+		20,
+		time.Minute,
+	)
+
 	api := r.Group("/api")
 
 	user := api.Group("/users")
 	{
-		user.POST("/register", userController.Register)
-		user.POST("/login", userController.Login)
+		user.POST("/register", registerLimiter.ByIP(), userController.Register)
+		user.POST("/login", loginLimiter.ByIP(), userController.Login)
 
 	}
 
@@ -171,71 +204,78 @@ func InitRouter(
 	auth.Use(middleware.AuthMiddleware())
 	{
 
-		auth.GET("/ws", wsController.Connect)
+		auth.GET("/ws", wsLimiter.ByUser(), wsController.Connect)
 
-		auth.GET("/users/me", userController.Me)
-		auth.PUT("/users/me", userController.UpdateMe)
-		friends := auth.Group("/friends")
+		rest := auth.Group("")
+		rest.Use(apiLimiter.ByUser())
 		{
-			friends.POST(
-				"/requests",
-				friendController.SendRequest,
-			)
-			friends.GET(
-				"/requests",
-				friendController.ListPendingRequests,
-			)
-			friends.POST(
-				"/requests/:id/accept",
-				friendController.AcceptRequest,
-			)
-			friends.GET(
-				"",
-				friendController.ListFriends,
-			)
-		}
 
-		teams := auth.Group("/teams")
-		{
-			teams.POST("", teamController.Create)
-			teams.GET("", teamController.ListMine)
-			teams.GET("/:id/members", teamController.ListMembers)
-			teams.POST("/:id/members", teamController.AddMember)
+			rest.GET("/users/me", userController.Me)
+			rest.PUT("/users/me", userController.UpdateMe)
 
-			channels := teams.Group("/:id/channels")
+			friends := rest.Group("/friends")
 			{
-				channels.POST("", channelController.Create)
-				channels.GET("", channelController.List)
+				friends.POST(
+					"/requests",
+					friendController.SendRequest,
+				)
+				friends.GET(
+					"/requests",
+					friendController.ListPendingRequests,
+				)
+				friends.POST(
+					"/requests/:id/accept",
+					friendController.AcceptRequest,
+				)
+				friends.GET(
+					"",
+					friendController.ListFriends,
+				)
+			}
+
+			teams := rest.Group("/teams")
+			{
+				teams.POST("", teamController.Create)
+				teams.GET("", teamController.ListMine)
+				teams.GET("/:id/members", teamController.ListMembers)
+				teams.POST("/:id/members", teamController.AddMember)
+
+				channels := teams.Group("/:id/channels")
+				{
+					channels.POST("", channelController.Create)
+					channels.GET("", channelController.List)
+				}
+			}
+			rest.GET("/channels/:id/messages", messageController.ListRecent)
+			rest.POST("/channels/:id/read", readController.MarkRead)
+			rest.GET("/channels/:id/unread-count", readController.UnreadCount)
+			rest.GET("/channels/:id/messages/sync", messageController.Sync)
+
+			conversationGroup := rest.Group("/conversations")
+			{
+				conversationGroup.POST("/direct", conversationController.CreateDirect)
+
+				conversationGroup.GET(
+					"/:id/messages",
+					conversationMessageController.ListRecent,
+				)
+
+				conversationGroup.GET(
+					"/:id/messages/sync",
+					conversationMessageController.Sync,
+				)
+				conversationGroup.GET(
+					"",
+					conversationController.List,
+				)
+				conversationGroup.GET(
+					"/:id/receipt-state",
+					directReceiptController.ReceiptState,
+				)
 			}
 		}
-		auth.GET("/channels/:id/messages", messageController.ListRecent)
-		auth.POST("/channels/:id/read", readController.MarkRead)
-		auth.GET("/channels/:id/unread-count", readController.UnreadCount)
-		auth.GET("/channels/:id/messages/sync", messageController.Sync)
 
-		conversationGroup := auth.Group("/conversations")
-		{
-			conversationGroup.POST("/direct", conversationController.CreateDirect)
-
-			conversationGroup.GET(
-				"/:id/messages",
-				conversationMessageController.ListRecent,
-			)
-
-			conversationGroup.GET(
-				"/:id/messages/sync",
-				conversationMessageController.Sync,
-			)
-			conversationGroup.GET(
-				"",
-				conversationController.List,
-			)
-			conversationGroup.GET(
-				"/:id/receipt-state",
-				directReceiptController.ReceiptState,
-			)
-		}
 	}
 
-	return r
+	return r, nil
 }
