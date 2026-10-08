@@ -24,11 +24,8 @@ func NewRedisBroker(
 }
 
 func ConversationTopic(conversationID uint) string {
-	return fmt.Sprintf(
-		"%s%d",
-		conversationTopicPrefix,
-		conversationID,
-	)
+	return conversationTopicPrefix +
+		strconv.FormatUint(uint64(conversationID), 10)
 }
 
 func ParseConversationTopic(
