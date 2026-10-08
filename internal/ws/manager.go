@@ -311,3 +311,17 @@ func (m *Manager) Shutdown() {
 	wg.Wait()
 
 }
+
+func (m *Manager) OnlineUserCount() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	return len(m.clients)
+}
+
+func (m *Manager) ConnectionCount() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	return len(m.allClients)
+}

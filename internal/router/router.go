@@ -2,10 +2,12 @@ package router
 
 import (
 	"fmt"
+
 	"time"
 
 	"github.com/chilljzz/gohub/internal/controller"
 	"github.com/chilljzz/gohub/internal/database"
+	"github.com/chilljzz/gohub/internal/metrics"
 	"github.com/chilljzz/gohub/internal/middleware"
 	"github.com/chilljzz/gohub/internal/realtime"
 	"github.com/chilljzz/gohub/internal/repository"
@@ -19,6 +21,7 @@ func InitRouter(
 	broker *realtime.RedisBroker,
 	wsManager *ws.Manager,
 	messageEventPublisher service.MessageEventPublisher,
+	appMetrics *metrics.Metrics,
 ) (*gin.Engine, error) {
 	r := gin.New()
 
@@ -31,6 +34,8 @@ func InitRouter(
 	r.Use(middleware.AccessLogger())
 
 	r.Use(middleware.SecurityHeaders())
+
+	r.Use(middleware.PrometheusMetrics(appMetrics))
 
 	r.Use(middleware.ErrorMiddleware())
 
@@ -189,6 +194,13 @@ func InitRouter(
 		"gohub:ratelimit:ws",
 		20,
 		time.Minute,
+	)
+
+	r.GET(
+		"/metrics",
+		gin.WrapH(
+			appMetrics.Handler(),
+		),
 	)
 
 	api := r.Group("/api")
