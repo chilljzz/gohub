@@ -47,6 +47,7 @@ func (c *UserController) UpdateMe(ctx *gin.Context) {
 			response.CodeUnauthorized,
 			"user identity not found",
 		)
+		return
 	}
 	var req request.UpdateProfileRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {

@@ -254,7 +254,12 @@ func (m *Manager) RoomUserIDs(
 }
 
 func (m *Manager) Shutdown() {
-	m.mu.RLock()
+	m.mu.Lock()
+
+	if m.shuttingDown {
+		m.mu.Unlock()
+		return
+	}
 
 	m.shuttingDown = true
 
@@ -273,7 +278,7 @@ func (m *Manager) Shutdown() {
 			)
 	}
 
-	m.mu.RUnlock()
+	m.mu.Unlock()
 
 	const workerCount = 64
 
