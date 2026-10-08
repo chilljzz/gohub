@@ -12,6 +12,7 @@ import (
 
 	"github.com/chilljzz/gohub/internal/database"
 	"github.com/chilljzz/gohub/internal/messaging"
+	"github.com/chilljzz/gohub/internal/metrics"
 	"github.com/chilljzz/gohub/internal/realtime"
 	"github.com/chilljzz/gohub/internal/router"
 	"github.com/chilljzz/gohub/internal/ws"
@@ -36,6 +37,8 @@ func New(ctx context.Context) (*App, error) {
 
 	manager := ws.NewManager()
 
+	appMetrics := metrics.New(manager)
+
 	broker := realtime.NewRedisBroker(
 		database.RedisClient,
 	)
@@ -55,6 +58,7 @@ func New(ctx context.Context) (*App, error) {
 		broker,
 		manager,
 		kafkaPublisher,
+		appMetrics,
 	)
 	if err != nil {
 		kafkaConsumer.Close()
