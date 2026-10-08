@@ -43,7 +43,7 @@ func New(manager *ws.Manager) *Metrics {
 			prometheus.HistogramOpts{
 				Namespace: "gohub",
 				Subsystem: "http",
-				Name:      "requests_duration_seconds",
+				Name:      "request_duration_seconds",
 				Help:      "HTTP request duration in seconds",
 
 				Buckets: []float64{

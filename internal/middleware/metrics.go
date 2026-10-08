@@ -21,10 +21,8 @@ func PrometheusMetrics(
 		if route == "" {
 			route = "unmatched"
 		}
-		if route == "/ping" {
-			return
-		}
-		if route == "/metrics" {
+
+		if route == "/metrics" || route == "/api/ws" {
 			return
 		}
 		appMetrics.ObserveHTTPRequest(
