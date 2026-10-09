@@ -28,7 +28,7 @@ jobs:
 
       - name: Check formatting
         run: |
-          files:=(gofmt -l $(git ls-files '*.go'))
+          files=$(gofmt -l $(git ls-files '*.go'))
           if [ -n "$files" ]; then
             echo "$files"
             exit 1
