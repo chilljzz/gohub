@@ -39,12 +39,6 @@ func InitRouter(
 
 	r.Use(middleware.ErrorMiddleware())
 
-	r.GET("/ping", func(ctx *gin.Context) {
-		response.Success(ctx, gin.H{
-			"msg": "pong",
-		})
-	})
-
 	db := database.DB
 	messageRepo :=
 		repository.NewMessageRepository(
@@ -196,12 +190,18 @@ func InitRouter(
 		time.Minute,
 	)
 
-	r.GET(
-		"/metrics",
-		gin.WrapH(
-			appMetrics.Handler(),
-		),
-	)
+	// r.GET("/ping", func(ctx *gin.Context) {
+	// 	response.Success(ctx, gin.H{
+	// 		"msg": "pong",
+	// 	})
+	// })
+
+	// r.GET(
+	// 	"/metrics",
+	// 	gin.WrapH(
+	// 		appMetrics.Handler(),
+	// 	),
+	// )
 
 	api := r.Group("/api")
 
@@ -290,4 +290,20 @@ func InitRouter(
 	}
 
 	return r, nil
+}
+
+func registerSystemRoutes(
+	r *gin.Engine,
+	appMetrics *metrics.Metrics,
+) {
+	r.GET("/ping", func(ctx *gin.Context) {
+		response.Success(ctx, gin.H{
+			"msg": "pong",
+		})
+	})
+
+	r.GET(
+		"/metrics",
+		gin.WrapH(appMetrics.Handler()),
+	)
 }
