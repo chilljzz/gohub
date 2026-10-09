@@ -1,0 +1,117 @@
+{
+  "uid": "gohub-overview",
+  "title": "GoHub - Backend Overview",
+  "tags": ["gohub", "backend"],
+  "timezone": "browser",
+  "schemaVersion": 42,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "HTTP QPS (including health checks)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gohub-prometheus"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "reqps"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(gohub_http_requests_total[5m])) or vector(0)"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "HTTP 5xx error rate (%)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gohub-prometheus"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "percent"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (sum(rate(gohub_http_requests_total{status=~\"5..\",route!=\"/ping\"}[5m])) or vector(0)) / clamp_min((sum(rate(gohub_http_requests_total{route!=\"/ping\"}[5m])) or vector(0)), 1e-9)"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "HTTP P95 latency (excluding /ping)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gohub-prometheus"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(gohub_http_request_duration_seconds_bucket{route!=\"/ping\"}[5m])))"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "WebSocket connections",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gohub-prometheus"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "gohub_websocket_connections"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "WebSocket online users",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gohub-prometheus"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "gohub_websocket_online_users"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Go heap allocation (bytes)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "gohub-prometheus"
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "fieldConfig": {"defaults": {"unit": "bytes"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "go_memstats_heap_alloc_bytes"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+apiVersion: 1
+
+
+providers:
+  - name: GoHub
+    orgId: 1
+    folder: GoHub
+    type: file
+
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+
+    options:
+      path: /var/lib/grafana/dashboards
