@@ -128,3 +128,59 @@ func TestManagerConcurrentRegisterUnregister(t *testing.T) {
 		t.Errorf("room still has %d users", len(users))
 	}
 }
+
+func TestManagerBroadcast(t *testing.T) {
+	manager := NewManager()
+
+	clientA := NewClient(
+		1001, nil, manager, nil, nil,
+	)
+	clientB := NewClient(
+		1002, nil, manager, nil, nil,
+	)
+
+	if !manager.Register(clientA) {
+		t.Fatal("register clientA failed")
+	}
+	if !manager.Register(clientB) {
+		t.Fatal("register clientB failed")
+	}
+
+	defer manager.Unregister(clientA)
+	defer manager.Unregister(clientB)
+
+	manager.JoinConversation(4001, clientA)
+	manager.JoinConversation(4001, clientB)
+
+	payload := []byte("hello gohub")
+
+	count := manager.BroadcastToConversation(
+		4001, payload,
+	)
+
+	if count != 2 {
+		t.Fatalf(
+			"broadcast count = %d, want 2",
+			count,
+		)
+	}
+
+	for _, client := range []*Client{clientA, clientB} {
+		if len(client.Send) != 1 {
+			t.Fatalf(
+				"send queue length = %d, want 1",
+				len(client.Send),
+			)
+		}
+
+		got := <-client.Send
+
+		if string(got) != string(payload) {
+			t.Errorf(
+				"got %q, want %q",
+				got,
+				payload,
+			)
+		}
+	}
+}

@@ -1,0 +1,47 @@
+name: GO CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feat/**"
+  pull_request:
+    branches:
+      - main
+  
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        run: |
+          files:=(gofmt -l $(git ls-files '*.go'))
+          if [ -n "$files" ]; then
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Go vet
+        run: go vet ./...
+       
+      - name: Unit tests with race detector
+        run: go test -race -count=1 -timeout=5m ./...
+
+      - name: Build application
+        run: go build ./cmd/server
+
+
+      
