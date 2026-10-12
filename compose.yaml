@@ -244,6 +244,26 @@ services:
     depends_on:
       - prometheus
 
+  migrate:
+    profiles:
+      - tools
+    
+    build: 
+      context: .
+      dockerfile: migrations/Dockerfile
+
+    environment:
+      GOOSE_DRIVER: mysql
+      GOOSE_DBSTRING: "${GOHUB_MYSQL_USERNAME}:${GOHUB_MYSQL_PASSWORD}@tcp(mysql:3306)/${GOHUB_MYSQL_DATABASE}?parseTime=true"
+      GOOSE_MIGRATION_DIR: /migrations
+
+    volumes:
+      - ./migrations:/migrations:ro
+    
+    depends_on:
+      mysql:
+        condition: service_healthy
+
 
 volumes:
   mysql_data:
@@ -251,3 +271,4 @@ volumes:
   kafka_data:
   prometheus_data:
   grafana_data:
+  migrate_data:
