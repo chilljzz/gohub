@@ -190,6 +190,7 @@ func InitRouter(
 		time.Minute,
 	)
 
+	registerSystemRoutes(r, appMetrics)
 	// r.GET("/ping", func(ctx *gin.Context) {
 	// 	response.Success(ctx, gin.H{
 	// 		"msg": "pong",

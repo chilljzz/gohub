@@ -92,14 +92,14 @@ func (s *ChannelMessageService) CreateChannelMessage(
 		Content:         content,
 	}
 
-	err = s.messageRepo.Create(message)
+	err = s.messageRepo.CreateWithOutbox(message)
 
 	if err == nil {
 
-		publishMessageCreatedBestEffort(
-			s.eventPublisher,
-			message,
-		)
+		// publishMessageCreatedBestEffort(
+		// 	s.eventPublisher,
+		// 	message,
+		// )
 
 		result := toChannelMessageResult(
 			message,

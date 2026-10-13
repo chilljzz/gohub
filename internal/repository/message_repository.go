@@ -1,8 +1,13 @@
 package repository
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"strconv"
+	"time"
 
+	"github.com/chilljzz/gohub/internal/event"
 	"github.com/chilljzz/gohub/internal/model"
 	"gorm.io/gorm"
 )
@@ -23,6 +28,57 @@ func (r *MessageRepository) Create(
 	message *model.Message,
 ) error {
 	return r.db.Create(message).Error
+}
+
+func (r *MessageRepository) CreateWithOutbox(
+	message *model.Message,
+) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(message).Error; err != nil {
+			return err
+		}
+
+		e := event.MessageCreated{
+			EventID: fmt.Sprintf(
+				"message.created:" + strconv.FormatUint(uint64(message.ID), 10),
+			),
+			Type:       event.TypeMessageCreated,
+			Version:    event.MessageCreatedV1,
+			OccurredAt: time.Now().UTC(),
+
+			MessageID:       message.ID,
+			ConversationID:  message.ConversationID,
+			SenderID:        message.SenderID,
+			ClientMessageID: message.ClientMessageID,
+			Content:         message.Content,
+			CreatedAt:       message.CreatedAt,
+		}
+		payload, err := json.Marshal(e)
+
+		if err != nil {
+			return fmt.Errorf(
+				"marshal message event: %w", err,
+			)
+		}
+
+		outbox := model.OutBoxEvent{
+			EventID:       e.EventID,
+			AggregateType: "conversation",
+			AggregateID:   uint64(message.ConversationID),
+			EventType:     e.Type,
+			Payload:       string(payload),
+			Status:        "pending",
+		}
+
+		if err := tx.Create(&outbox).Error; err != nil {
+			return fmt.Errorf(
+				"insert outbox event: %w", err,
+			)
+		}
+
+		return nil
+
+	})
 }
 
 func (r *MessageRepository) FindByID(

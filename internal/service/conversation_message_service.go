@@ -75,13 +75,13 @@ func (s *ConversationMessageService) CreateMessage(
 		Content: content,
 	}
 
-	err = s.messageRepo.Create(
+	err = s.messageRepo.CreateWithOutbox(
 		message,
 	)
 
 	if err == nil {
 
-		publishMessageCreatedBestEffort(s.eventPublisher, message)
+		//publishMessageCreatedBestEffort(s.eventPublisher, message)
 
 		return &CreateConversationMessageResult{
 			Message: toConversationMessageResult(message),
