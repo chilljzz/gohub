@@ -17,7 +17,7 @@ COPY . .
 
 RUN mkdir -p /out \
     && CGO_ENABLED=0 \
-    COOS=linux \
+    GOOS=linux \
     go build \
     -trimpath \
     -ldflags="-s -w"\
