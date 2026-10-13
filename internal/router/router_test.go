@@ -19,13 +19,10 @@ func newTestRouter() *gin.Engine {
 	manager := ws.NewManager()
 	appMetrics := metrics.New(manager)
 
-	r := gin.New()
-
-	r.Use(middleware.RequestID())
-	r.Use(middleware.SecurityHeaders())
-	r.Use(middleware.PrometheusMetrics(appMetrics))
-
-	registerSystemRoutes(r, appMetrics)
+	r, err := newBaseRouter(appMetrics)
+	if err != nil {
+		panic(err)
+	}
 
 	r.GET(
 		"/api/private",

@@ -7,5 +7,5 @@ type ConversationMember struct {
 
 	UserID uint `gorm:"primaryKey;index:idx_conversation_member_user" json:"user_id"`
 
-	JoinedAt time.Time `json:"joined_at"`
+	JoinedAt time.Time `gorm:"autoCreateTime" json:"joined_at"`
 }

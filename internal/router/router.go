@@ -17,27 +17,40 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func newBaseRouter(
+	appMetrics *metrics.Metrics,
+) (*gin.Engine, error) {
+	r := gin.New()
+
+	if err := r.SetTrustedProxies(nil); err != nil {
+		return nil, fmt.Errorf(
+			"set trusted proxies: %w",
+			err,
+		)
+	}
+
+	r.Use(middleware.RequestID())
+	r.Use(middleware.AccessLogger())
+	r.Use(middleware.SecurityHeaders())
+	r.Use(middleware.PrometheusMetrics(appMetrics))
+	r.Use(middleware.ErrorMiddleware())
+
+	registerSystemRoutes(r, appMetrics)
+
+	return r, nil
+}
+
 func InitRouter(
 	broker *realtime.RedisBroker,
 	wsManager *ws.Manager,
 	messageEventPublisher service.MessageEventPublisher,
 	appMetrics *metrics.Metrics,
 ) (*gin.Engine, error) {
-	r := gin.New()
+	r, err := newBaseRouter(appMetrics)
 
-	if err := r.SetTrustedProxies(nil); err != nil {
-		return nil, fmt.Errorf("ser trusted proxies: %w", err)
+	if err != nil {
+		return nil, err
 	}
-
-	r.Use(middleware.RequestID())
-
-	r.Use(middleware.AccessLogger())
-
-	r.Use(middleware.SecurityHeaders())
-
-	r.Use(middleware.PrometheusMetrics(appMetrics))
-
-	r.Use(middleware.ErrorMiddleware())
 
 	db := database.DB
 	messageRepo :=
@@ -189,20 +202,6 @@ func InitRouter(
 		20,
 		time.Minute,
 	)
-
-	registerSystemRoutes(r, appMetrics)
-	// r.GET("/ping", func(ctx *gin.Context) {
-	// 	response.Success(ctx, gin.H{
-	// 		"msg": "pong",
-	// 	})
-	// })
-
-	// r.GET(
-	// 	"/metrics",
-	// 	gin.WrapH(
-	// 		appMetrics.Handler(),
-	// 	),
-	// )
 
 	api := r.Group("/api")
 
