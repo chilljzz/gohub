@@ -39,9 +39,7 @@ func (r *MessageRepository) CreateWithOutbox(
 		}
 
 		e := event.MessageCreated{
-			EventID: fmt.Sprintf(
-				"message.created:" + strconv.FormatUint(uint64(message.ID), 10),
-			),
+			EventID:    "message.created:" + strconv.FormatUint(uint64(message.ID), 10),
 			Type:       event.TypeMessageCreated,
 			Version:    event.MessageCreatedV1,
 			OccurredAt: time.Now().UTC(),
