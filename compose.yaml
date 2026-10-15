@@ -264,6 +264,34 @@ services:
       mysql:
         condition: service_healthy
 
+  outbox-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.outbox
+      args:
+         GOPROXY: ${GOHUB_BUILD_GOPROXY}
+    
+    restart: unless-stopped
+
+    environment:
+      GOHUB_SERVER_MODE: release
+      GOHUB_MYSQL_HOST: mysql
+      GOHUB_MYSQL_PORT: 3306
+      GOHUB_MYSQL_USERNAME: ${GOHUB_MYSQL_USERNAME}
+      GOHUB_MYSQL_PASSWORD: ${GOHUB_MYSQL_PASSWORD}
+      GOHUB_MYSQL_DATABASE: ${GOHUB_MYSQL_DATABASE}
+      GOHUB_MYSQL_CHARSET: utf8mb4
+      GOHUB_KAFKA_BROKERS: kafka:9092
+      GOHUB_KAFKA_MESSAGE_CREATED_TOPIC: ${GOHUB_KAFKA_MESSAGE_CREATED_TOPIC}
+      GOHUB_KAFKA_CONSUMER_GROUP: ${GOHUB_KAFKA_CONSUMER_GROUP}
+    
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+  
+
 
 volumes:
   mysql_data:
@@ -272,3 +300,4 @@ volumes:
   prometheus_data:
   grafana_data:
   migrate_data:
+  
